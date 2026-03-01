@@ -39,7 +39,7 @@ dependencies {
     androidTestImplementation libs.ext.junit
     androidTestImplementation libs.espresso.core
 
-    def room_version = "2.6.1"
+    def room_version = "2.5.2"
     def lifecycle_version = "2.6.2"
 
     // Room Database

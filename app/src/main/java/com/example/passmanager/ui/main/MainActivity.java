@@ -1,5 +1,8 @@
 package com.example.passmanager.ui.main;
-
+import androidx.annotation.NonNull;
+import androidx.biometric.BiometricPrompt;
+import androidx.core.content.ContextCompat;
+import java.util.concurrent.Executor;
 import android.content.ClipData;
 import android.content.ClipboardManager;
 import android.content.Context;
@@ -53,54 +56,63 @@ public class MainActivity extends AppCompatActivity {
         vaultViewModel.getAllCredentials().observe(this, (java.util.List<com.example.passmanager.data.model.Credential> credentials) -> {
             adapter.setCredentials(credentials);
         });
+
         adapter.setOnItemClickListener(credential -> {
-            try {
-                // 1. Decrypt the password using the ciphertext and IV
-                String decryptedPassword = EncryptionUtil.decryptPassword(
-                        credential.getEncryptedPassword(),
-                        credential.getEncryptionIv()
-                );
 
-                // 2. Show the result in a secure pop-up dialog
-                new MaterialAlertDialogBuilder(MainActivity.this)
-                        .setTitle(credential.getTitle())
-                        .setMessage("Username: " + credential.getUsername() + "\n\nPassword: " + decryptedPassword)
-                        .setPositiveButton("Close", (dialog, which) -> dialog.dismiss())
-                        .show();
+            // Wrap the entire action inside the biometric prompt!
+            authenticateUser(() -> {
+                try {
+                    String decryptedPassword = EncryptionUtil.decryptPassword(
+                            credential.getEncryptedPassword(),
+                            credential.getEncryptionIv()
+                    );
 
-            } catch (Exception e) {
-                e.printStackTrace();
-                Toast.makeText(MainActivity.this, "Decryption Failed!", Toast.LENGTH_SHORT).show();
-            }
+                    new MaterialAlertDialogBuilder(MainActivity.this)
+                            .setTitle(credential.getTitle())
+                            .setMessage("Username: " + credential.getUsername() + "\n\nPassword: " + decryptedPassword)
+                            .setPositiveButton("Close", (dialog, which) -> dialog.dismiss())
+                            .setNeutralButton("Copy Password", (dialog, which) -> {
+                                android.content.ClipboardManager clipboard = (android.content.ClipboardManager) getSystemService(android.content.Context.CLIPBOARD_SERVICE);
+                                android.content.ClipData clip = android.content.ClipData.newPlainText("Vault Password", decryptedPassword);
+                                clipboard.setPrimaryClip(clip);
+                                android.widget.Toast.makeText(MainActivity.this, "Copied to clipboard", android.widget.Toast.LENGTH_SHORT).show();
+                            })
+                            .show();
+
+                } catch (Exception e) {
+                    e.printStackTrace();
+                    android.widget.Toast.makeText(MainActivity.this, "Decryption Failed!", android.widget.Toast.LENGTH_SHORT).show();
+                }
+            });
+
         });
         new ItemTouchHelper(new ItemTouchHelper.SimpleCallback(0, ItemTouchHelper.LEFT | ItemTouchHelper.RIGHT) {
             @Override
-            public boolean onMove(@NonNull RecyclerView recyclerView, @NonNull RecyclerView.ViewHolder viewHolder, @NonNull RecyclerView.ViewHolder target) {
+            public boolean onMove(@NonNull androidx.recyclerview.widget.RecyclerView recyclerView, @NonNull androidx.recyclerview.widget.RecyclerView.ViewHolder viewHolder, @NonNull androidx.recyclerview.widget.RecyclerView.ViewHolder target) {
                 return false;
             }
 
             @Override
-            public void onSwiped(@NonNull RecyclerView.ViewHolder viewHolder, int direction) {
-                // 1. Find out which item was swiped
+            public void onSwiped(@NonNull androidx.recyclerview.widget.RecyclerView.ViewHolder viewHolder, int direction) {
                 int position = viewHolder.getAdapterPosition();
-                Credential credentialToDelete = adapter.getCredentialAt(position);
+                com.example.passmanager.data.model.Credential credentialToDelete = adapter.getCredentialAt(position);
 
-                // 2. Show confirmation dialog
-                new MaterialAlertDialogBuilder(MainActivity.this)
-                        .setTitle("Delete Password?")
-                        .setMessage("Are you sure you want to delete the credentials for " + credentialToDelete.getTitle() + "?")
-                        .setPositiveButton("Delete", (dialog, which) -> {
-                            // User confirmed: Delete from database
-                            vaultViewModel.delete(credentialToDelete);
-                            Toast.makeText(MainActivity.this, "Credential Deleted", Toast.LENGTH_SHORT).show();
-                        })
-                        .setNegativeButton("Cancel", (dialog, which) -> {
-                            // User canceled: Undo the swipe animation and redraw the item
-                            adapter.notifyItemChanged(position);
-                            dialog.dismiss();
-                        })
-                        .setCancelable(false) // Forces the user to explicitly tap a button
-                        .show();
+                // Instantly bounce the item back into the list while we verify
+                adapter.notifyItemChanged(position);
+
+                // Ask for Fingerprint/Face before showing the delete confirmation
+                authenticateUser(() -> {
+                    new com.google.android.material.dialog.MaterialAlertDialogBuilder(MainActivity.this)
+                            .setTitle("Delete Password?")
+                            .setMessage("Are you sure you want to delete the credentials for " + credentialToDelete.getTitle() + "?")
+                            .setPositiveButton("Delete", (dialog, which) -> {
+                                vaultViewModel.delete(credentialToDelete);
+                                android.widget.Toast.makeText(MainActivity.this, "Credential Deleted", android.widget.Toast.LENGTH_SHORT).show();
+                            })
+                            .setNegativeButton("Cancel", (dialog, which) -> dialog.dismiss())
+                            .setCancelable(false)
+                            .show();
+                });
             }
         }).attachToRecyclerView(recyclerView);
 
@@ -110,5 +122,40 @@ public class MainActivity extends AppCompatActivity {
             android.content.Intent intent = new android.content.Intent(MainActivity.this, AddCredentialActivity.class);
             startActivity(intent);
         });
+    }
+    private void authenticateUser(Runnable onSuccessAction) {
+        Executor executor = ContextCompat.getMainExecutor(this);
+
+        BiometricPrompt biometricPrompt = new BiometricPrompt(MainActivity.this,
+                executor, new BiometricPrompt.AuthenticationCallback() {
+            @Override
+            public void onAuthenticationError(int errorCode, @NonNull CharSequence errString) {
+                super.onAuthenticationError(errorCode, errString);
+                Toast.makeText(getApplicationContext(), "Authentication error: " + errString, Toast.LENGTH_SHORT).show();
+            }
+
+            @Override
+            public void onAuthenticationSucceeded(@NonNull BiometricPrompt.AuthenticationResult result) {
+                super.onAuthenticationSucceeded(result);
+                // If the fingerprint/PIN matches, execute the action!
+                onSuccessAction.run();
+            }
+
+            @Override
+            public void onAuthenticationFailed() {
+                super.onAuthenticationFailed();
+                Toast.makeText(getApplicationContext(), "Authentication failed", Toast.LENGTH_SHORT).show();
+            }
+        });
+
+        // Configure what the prompt looks like and what security types are allowed
+        BiometricPrompt.PromptInfo promptInfo = new BiometricPrompt.PromptInfo.Builder()
+                .setTitle("Unlock Vault")
+                .setSubtitle("Verify your identity to access this credential")
+                // Allows Fingerprint/Face OR the device PIN/Pattern
+                .setAllowedAuthenticators(androidx.biometric.BiometricManager.Authenticators.BIOMETRIC_STRONG | androidx.biometric.BiometricManager.Authenticators.DEVICE_CREDENTIAL)
+                .build();
+
+        biometricPrompt.authenticate(promptInfo);
     }
 }

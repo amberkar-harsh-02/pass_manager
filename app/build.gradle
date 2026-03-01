@@ -49,4 +49,5 @@ dependencies {
     // Lifecycle and LiveData (Needed for your CredentialDao and Repository)
     implementation "androidx.lifecycle:lifecycle-livedata:$lifecycle_version"
     implementation "androidx.lifecycle:lifecycle-viewmodel:$lifecycle_version"
+    implementation 'androidx.biometric:biometric:1.1.0'
 }

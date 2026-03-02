@@ -1,6 +1,6 @@
 package com.example.passmanager.ui.main;
 
-
+import java.security.SecureRandom;
 import android.os.Bundle;
 import android.util.Pair;
 import android.view.WindowManager;
@@ -37,6 +37,14 @@ public class AddCredentialActivity extends AppCompatActivity {
         EditText editTextPassword = findViewById(R.id.edit_text_password);
         Button buttonSave = findViewById(R.id.button_save_credential);
 
+
+        android.widget.Button buttonGenerate = findViewById(R.id.button_generate_password);
+
+        buttonGenerate.setOnClickListener(v -> {
+            // Generate the password and instantly fill the text box
+            String newPassword = generateSecurePassword();
+            editTextPassword.setText(newPassword);
+        });
         buttonSave.setOnClickListener(v -> {
             String title = editTextTitle.getText().toString().trim();
             String username = editTextUsername.getText().toString().trim();
@@ -71,5 +79,17 @@ public class AddCredentialActivity extends AppCompatActivity {
                 Toast.makeText(this, "Encryption Failed!", Toast.LENGTH_LONG).show();
             }
         });
+    }
+    private String generateSecurePassword() {
+        // The pool of characters to choose from
+        String chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*()-_=+<>?";
+        SecureRandom random = new SecureRandom();
+        StringBuilder sb = new StringBuilder(16); // 16 characters long
+
+        for (int i = 0; i < 16; i++) {
+            int randomIndex = random.nextInt(chars.length());
+            sb.append(chars.charAt(randomIndex));
+        }
+        return sb.toString();
     }
 }

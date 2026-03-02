@@ -1,4 +1,7 @@
 package com.example.passmanager.ui.main;
+import android.view.View;
+import androidx.fragment.app.Fragment;
+import com.google.android.material.bottomnavigation.BottomNavigationView;
 import androidx.annotation.NonNull;
 import androidx.biometric.BiometricPrompt;
 import androidx.core.content.ContextCompat;
@@ -49,7 +52,43 @@ public class MainActivity extends AppCompatActivity {
 
         // Initialize ViewModel
         vaultViewModel = new ViewModelProvider(this).get(VaultViewModel.class);
+        BottomNavigationView bottomNav = findViewById(R.id.bottom_navigation);
+        android.widget.FrameLayout fragmentContainer = findViewById(R.id.fragment_container);
 
+        // We use if/else instead of switch statements to avoid compile errors in modern Android Studio
+        bottomNav.setOnItemSelectedListener(item -> {
+            int itemId = item.getItemId();
+
+            if (itemId == R.id.nav_vault) {
+                // 1. Show Vault, Hide Canvas
+                fragmentContainer.setVisibility(View.GONE);
+                recyclerView.setVisibility(View.VISIBLE);
+                fabAdd.setVisibility(View.VISIBLE);
+                return true;
+
+            } else if (itemId == R.id.nav_profile) {
+                // 2. Hide Vault, Show Canvas, Load Profile Screen
+                recyclerView.setVisibility(View.GONE);
+                fabAdd.setVisibility(View.GONE);
+                fragmentContainer.setVisibility(View.VISIBLE);
+
+                getSupportFragmentManager().beginTransaction()
+                        .replace(R.id.fragment_container, new ProfileFragment())
+                        .commit();
+                return true;
+
+            } else if (itemId == R.id.nav_security) {
+                // Placeholder for now
+                android.widget.Toast.makeText(MainActivity.this, "Security coming soon", android.widget.Toast.LENGTH_SHORT).show();
+                return true;
+
+            } else if (itemId == R.id.nav_about) {
+                // Placeholder for now
+                android.widget.Toast.makeText(MainActivity.this, "About coming soon", android.widget.Toast.LENGTH_SHORT).show();
+                return true;
+            }
+            return false;
+        });
         // OBSERVE THE DATABASE:
         // Any time a password is added, updated, or deleted in the background,
         // this observer triggers and pushes the fresh list to the UI adapter.

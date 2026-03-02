@@ -9,13 +9,30 @@
     android:fitsSystemWindows="true"
     tools:context=".ui.main.MainActivity">
 
+    <EditText
+        android:id="@+id/edit_text_search"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_margin="16dp"
+        android:backgroundTint="@color/vault_accent"
+        android:hint="Search Vault..."
+        android:textColorHint="@color/vault_text_secondary"
+        android:textColor="@color/vault_text_primary"
+        android:inputType="text"
+        android:maxLines="1"
+        android:drawableStart="@android:drawable/ic_menu_search"
+        android:drawablePadding="8dp"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent" />
+
     <androidx.recyclerview.widget.RecyclerView
         android:id="@+id/recyclerView_credentials"
         android:layout_width="0dp"
         android:layout_height="0dp"
         android:clipToPadding="false"
         android:padding="8dp"
-        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintTop_toBottomOf="@+id/edit_text_search"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintBottom_toTopOf="@+id/bottom_navigation" />

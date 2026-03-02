@@ -27,8 +27,9 @@ import com.example.passmanager.ui.viewmodel.VaultViewModel;
 import com.google.android.material.floatingactionbutton.FloatingActionButton;
 
 public class MainActivity extends AppCompatActivity {
-
+    private java.util.List<com.example.passmanager.data.model.Credential> allCredentials = new java.util.ArrayList<>();
     private VaultViewModel vaultViewModel;
+    private CredentialAdapter adapter;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -47,10 +48,10 @@ public class MainActivity extends AppCompatActivity {
         recyclerView.setHasFixedSize(true);
 
         // Initialize the Adapter and attach it to the RecyclerView
-        final CredentialAdapter adapter = new CredentialAdapter();
+        adapter = new CredentialAdapter();
         recyclerView.setAdapter(adapter);
 
-        // Initialize ViewModel
+        // Initialize ViewModelada
         vaultViewModel = new ViewModelProvider(this).get(VaultViewModel.class);
         BottomNavigationView bottomNav = findViewById(R.id.bottom_navigation);
         android.widget.FrameLayout fragmentContainer = findViewById(R.id.fragment_container);
@@ -93,7 +94,20 @@ public class MainActivity extends AppCompatActivity {
         // Any time a password is added, updated, or deleted in the background,
         // this observer triggers and pushes the fresh list to the UI adapter.
         vaultViewModel.getAllCredentials().observe(this, (java.util.List<com.example.passmanager.data.model.Credential> credentials) -> {
-            adapter.setCredentials(credentials);
+            allCredentials = credentials;
+        });
+        android.widget.EditText searchBar = findViewById(R.id.edit_text_search);
+        searchBar.addTextChangedListener(new android.text.TextWatcher() {
+            @Override
+            public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
+
+            @Override
+            public void onTextChanged(CharSequence s, int start, int before, int count) {}
+
+            @Override
+            public void afterTextChanged(android.text.Editable s) {
+                filterVault(s.toString()); // Run the filter math every time a letter is typed!
+            }
         });
 
         adapter.setOnItemClickListener(credential -> {
@@ -161,6 +175,25 @@ public class MainActivity extends AppCompatActivity {
             android.content.Intent intent = new android.content.Intent(MainActivity.this, AddCredentialActivity.class);
             startActivity(intent);
         });
+    }
+    private void filterVault(String text) {
+        // Safety check: If the adapter is still null somehow, don't crash, just stop.
+        if (adapter == null) return;
+
+        java.util.List<com.example.passmanager.data.model.Credential> filteredList = new java.util.ArrayList<>();
+
+        for (com.example.passmanager.data.model.Credential item : allCredentials) {
+            // Safety check: Convert to lowercase, but default to empty string if the field is blank
+            String title = item.getTitle() != null ? item.getTitle().toLowerCase() : "";
+            String username = item.getUsername() != null ? item.getUsername().toLowerCase() : "";
+            String searchQuery = text.toLowerCase();
+
+            // Check if the title or username contains the search text
+            if (title.contains(searchQuery) || username.contains(searchQuery)) {
+                filteredList.add(item);
+            }
+        }
+        adapter.filterList(filteredList);
     }
     private void authenticateUser(Runnable onSuccessAction) {
         Executor executor = ContextCompat.getMainExecutor(this);

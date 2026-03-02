@@ -50,6 +50,11 @@ public class CredentialAdapter extends RecyclerView.Adapter<CredentialAdapter.Cr
         notifyDataSetChanged();
     }
 
+    public void filterList(List<Credential> filteredList) {
+        this.credentials = filteredList;
+        notifyDataSetChanged();
+    }
+
     public interface OnItemClickListener {
         void onItemClick(Credential credential);
     }

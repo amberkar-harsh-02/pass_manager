@@ -10,7 +10,7 @@
     <TextView
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="Security Dashboard"
+        android:text="Threat Dashboard"
         android:textColor="@color/vault_accent"
         android:textSize="28sp"
         android:textStyle="bold"
@@ -20,36 +20,119 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         app:cardBackgroundColor="@color/vault_surface"
-        app:cardCornerRadius="16dp"
-        app:cardElevation="8dp"
-        android:layout_marginBottom="16dp">
-
+        app:cardCornerRadius="12dp"
+        app:cardElevation="4dp"
+        android:layout_marginBottom="12dp">
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:orientation="vertical"
-            android:padding="24dp">
-
+            android:orientation="horizontal"
+            android:padding="20dp"
+            android:gravity="center_vertical">
             <TextView
-                android:layout_width="wrap_content"
+                android:layout_width="0dp"
                 android:layout_height="wrap_content"
-                android:text="Total Vault Items"
+                android:layout_weight="1"
+                android:text="Total Credentials"
                 android:textColor="@color/vault_text_secondary"
-                android:textSize="14sp"
-                android:textAllCaps="true"
-                android:letterSpacing="0.1"/>
-
+                android:textSize="16sp"
+                android:textAllCaps="true"/>
             <TextView
                 android:id="@+id/text_total_passwords"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="0"
                 android:textColor="@color/vault_text_primary"
-                android:textSize="48sp"
-                android:textStyle="bold"
-                android:layout_marginTop="8dp"/>
-
+                android:textSize="24sp"
+                android:textStyle="bold"/>
         </LinearLayout>
     </com.google.android.material.card.MaterialCardView>
+
+    <com.google.android.material.card.MaterialCardView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        app:cardBackgroundColor="@color/vault_surface"
+        app:cardCornerRadius="12dp"
+        app:cardElevation="4dp"
+        app:strokeColor="#FF5252"
+        app:strokeWidth="1dp"
+        android:layout_marginBottom="12dp">
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:padding="20dp"
+            android:gravity="center_vertical">
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="Vulnerabilities"
+                android:textColor="#FF5252"
+                android:textSize="16sp"
+                android:textAllCaps="true"
+                android:textStyle="bold"/>
+            <TextView
+                android:id="@+id/text_weak_passwords"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="0"
+                android:textColor="#FF5252"
+                android:textSize="24sp"
+                android:textStyle="bold"/>
+        </LinearLayout>
+    </com.google.android.material.card.MaterialCardView>
+
+    <com.google.android.material.card.MaterialCardView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        app:cardBackgroundColor="@color/vault_surface"
+        app:cardCornerRadius="12dp"
+        app:cardElevation="4dp"
+        app:strokeColor="#33D9B2"
+        app:strokeWidth="1dp">
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:padding="20dp"
+            android:gravity="center_vertical">
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="Secured Items"
+                android:textColor="#33D9B2"
+                android:textSize="16sp"
+                android:textAllCaps="true"
+                android:textStyle="bold"/>
+            <TextView
+                android:id="@+id/text_strong_passwords"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="0"
+                android:textColor="#33D9B2"
+                android:textSize="24sp"
+                android:textStyle="bold"/>
+        </LinearLayout>
+    </com.google.android.material.card.MaterialCardView>
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Action Required"
+        android:textColor="@color/vault_accent"
+        android:textSize="16sp"
+        android:textStyle="bold"
+        android:textAllCaps="true"
+        android:layout_marginTop="24dp"
+        android:layout_marginBottom="8dp"/>
+
+    <androidx.recyclerview.widget.RecyclerView
+        android:id="@+id/recyclerView_vulnerabilities"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:clipToPadding="false" />
 
 </LinearLayout>

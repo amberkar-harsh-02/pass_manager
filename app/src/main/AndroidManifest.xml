@@ -25,6 +25,10 @@
             android:name=".ui.main.AddCredentialActivity"
             android:windowSoftInputMode="adjustResize" />
 
+        <activity
+            android:name=".ui.main.EditCredentialActivity"
+            android:exported="false" />
+
     </application>
 
 </manifest>

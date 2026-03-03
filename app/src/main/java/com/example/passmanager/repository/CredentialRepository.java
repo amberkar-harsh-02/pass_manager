@@ -32,4 +32,8 @@ public class CredentialRepository {
     public void delete(Credential credential) {
         executorService.execute(() -> credentialDao.deleteCredential(credential));
     }
+
+    public void update(Credential credential) {
+        executorService.execute(() -> credentialDao.updateCredential(credential));
+    }
 }

@@ -39,4 +39,8 @@ public class VaultViewModel extends AndroidViewModel {
     public void delete(Credential credential) {
         repository.delete(credential);
     }
+
+    public void update(Credential credential) {
+        repository.update(credential);
+    }
 }

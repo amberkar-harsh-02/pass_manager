@@ -1,47 +1,40 @@
 package com.example.passmanager.data.model;
 
-import androidx.annotation.NonNull;
 import androidx.room.Entity;
 import androidx.room.PrimaryKey;
-import java.util.UUID;
 
 @Entity(tableName = "credentials_table")
 public class Credential {
 
-    @PrimaryKey
-    @NonNull
-    private String id;
+    @PrimaryKey(autoGenerate = true)
+    private int id;
+
     private String title;
     private String username;
     private String encryptedPassword;
     private String encryptionIv;
-    private String category;
-    private long lastUpdated;
 
-    public Credential() {
-        this.id = UUID.randomUUID().toString();
-        this.lastUpdated = System.currentTimeMillis();
+    // NEW: The 4-Tier Health Score (0=Weak, 1=Moderate, 2=Strong, 3=Very Strong)
+    private int healthScore;
+
+    // Update the constructor to accept the healthScore
+    public Credential(String title, String username, String encryptedPassword, String encryptionIv, int healthScore) {
+        this.title = title;
+        this.username = username;
+        this.encryptedPassword = encryptedPassword;
+        this.encryptionIv = encryptionIv;
+        this.healthScore = healthScore;
     }
 
-    @NonNull
-    public String getId() { return id; }
-    public void setId(@NonNull String id) { this.id = id; }
-
+    // Existing Getters and Setters...
+    public int getId() { return id; }
+    public void setId(int id) { this.id = id; }
     public String getTitle() { return title; }
-    public void setTitle(String title) { this.title = title; }
-
     public String getUsername() { return username; }
-    public void setUsername(String username) { this.username = username; }
-
     public String getEncryptedPassword() { return encryptedPassword; }
-    public void setEncryptedPassword(String encryptedPassword) { this.encryptedPassword = encryptedPassword; }
-
     public String getEncryptionIv() { return encryptionIv; }
-    public void setEncryptionIv(String encryptionIv) { this.encryptionIv = encryptionIv; }
 
-    public String getCategory() { return category; }
-    public void setCategory(String category) { this.category = category; }
-
-    public long getLastUpdated() { return lastUpdated; }
-    public void setLastUpdated(long lastUpdated) { this.lastUpdated = lastUpdated; }
+    // NEW: Getter and Setter for Health Score
+    public int getHealthScore() { return healthScore; }
+    public void setHealthScore(int healthScore) { this.healthScore = healthScore; }
 }

@@ -48,35 +48,34 @@ public class AddCredentialActivity extends AppCompatActivity {
         buttonSave.setOnClickListener(v -> {
             String title = editTextTitle.getText().toString().trim();
             String username = editTextUsername.getText().toString().trim();
-            String rawPassword = editTextPassword.getText().toString().trim();
+            String password = editTextPassword.getText().toString().trim();
 
-            if (title.isEmpty() || username.isEmpty() || rawPassword.isEmpty()) {
-                Toast.makeText(this, "Please fill out all fields", Toast.LENGTH_SHORT).show();
+            if (title.isEmpty() || password.isEmpty()) {
+                android.widget.Toast.makeText(AddCredentialActivity.this, "Title and Password are required", android.widget.Toast.LENGTH_SHORT).show();
                 return;
             }
 
             try {
-                // 1. Encrypt the password. This returns Pair(EncryptedString, IVString)
-                Pair<String, String> encryptedData = EncryptionUtil.encryptPassword(rawPassword);
+                // 1. CALCULATE HEALTH SCORE (Plaintext)
+                int healthScore = calculateHealthScore(password);
 
-                // 2. Create the database model
-                Credential newCredential = new Credential();
-                newCredential.setTitle(title);
-                newCredential.setUsername(username);
-                newCredential.setEncryptedPassword(encryptedData.first); // Ciphertext
-                newCredential.setEncryptionIv(encryptedData.second);     // Crucial IV
-                newCredential.setCategory("Uncategorized"); // You can add a category dropdown later
+                // 2. ENCRYPT THE PASSWORD (Using your Pair<String, String> method)
+                android.util.Pair<String, String> encryptedData = EncryptionUtil.encryptPassword(password);
+                String encryptedPassword = encryptedData.first; // The cipher text
+                String ivString = encryptedData.second;         // The IV
 
-                // 3. Save to Room database via ViewModel
-                vaultViewModel.insert(newCredential);
+                // 3. SAVE TO DATABASE (Now including the healthScore)
+                com.example.passmanager.data.model.Credential credential = new com.example.passmanager.data.model.Credential(
+                        title, username, encryptedPassword, ivString, healthScore
+                );
 
-                // 4. Show success message and close this screen
-                Toast.makeText(this, "Saved Securely", Toast.LENGTH_SHORT).show();
-                finish(); // Returns the user back to MainActivity
+                vaultViewModel.insert(credential);
+                android.widget.Toast.makeText(AddCredentialActivity.this, "Credential Saved Successfully", android.widget.Toast.LENGTH_SHORT).show();
+                finish(); // Close the activity
 
             } catch (Exception e) {
                 e.printStackTrace();
-                Toast.makeText(this, "Encryption Failed!", Toast.LENGTH_LONG).show();
+                android.widget.Toast.makeText(AddCredentialActivity.this, "Encryption Error!", android.widget.Toast.LENGTH_SHORT).show();
             }
         });
     }
@@ -91,5 +90,26 @@ public class AddCredentialActivity extends AppCompatActivity {
             sb.append(chars.charAt(randomIndex));
         }
         return sb.toString();
+    }
+    private int calculateHealthScore(String password) {
+        int score = 0;
+        if (password == null || password.isEmpty()) return 0; // 0 = Weak
+
+        // Point system based on length
+        if (password.length() >= 8) score++;
+        if (password.length() >= 12) score++;
+        if (password.length() >= 16) score++;
+
+        // Point system based on character variety (Regex matching)
+        if (password.matches(".*[a-z].*")) score++; // Has lowercase
+        if (password.matches(".*[A-Z].*")) score++; // Has uppercase
+        if (password.matches(".*\\d.*")) score++;   // Has digit
+        if (password.matches(".*[!@#$%^&*()_+\\-=\\[\\]{};':\"\\\\|,.<>\\/?].*")) score++; // Has symbol
+
+        // Max possible score is 7. Map this to our 4 tiers:
+        if (score <= 3) return 0; // Level 0: Weak
+        if (score == 4 || score == 5) return 1; // Level 1: Moderate
+        if (score == 6) return 2; // Level 2: Strong
+        return 3; // Level 3: Very Strong (7 points)
     }
 }

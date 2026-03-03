@@ -11,6 +11,8 @@ import androidx.recyclerview.widget.RecyclerView;
 import com.example.passmanager.R;
 import com.example.passmanager.data.model.Credential;
 
+import org.w3c.dom.Text;
+
 import java.util.ArrayList;
 import java.util.List;
 
@@ -32,6 +34,22 @@ public class CredentialAdapter extends RecyclerView.Adapter<CredentialAdapter.Cr
         Credential currentCredential = credentials.get(position);
         holder.textViewTitle.setText(currentCredential.getTitle());
         holder.textViewUsername.setText(currentCredential.getUsername());
+
+        int score = currentCredential.getHealthScore();
+
+        if (score == 0) {
+            holder.textHealthBadge.setText("WEAK");
+            holder.textHealthBadge.setTextColor(android.graphics.Color.parseColor("#FF5252")); // Threat Red
+        } else if (score == 1) {
+            holder.textHealthBadge.setText("MODERATE");
+            holder.textHealthBadge.setTextColor(android.graphics.Color.parseColor("#FFB142")); // Warning Orange
+        } else if (score == 2) {
+            holder.textHealthBadge.setText("STRONG");
+            holder.textHealthBadge.setTextColor(android.graphics.Color.parseColor("#34ACE0")); // Secure Blue
+        } else {
+            holder.textHealthBadge.setText("VERY STRONG");
+            holder.textHealthBadge.setTextColor(android.graphics.Color.parseColor("#33D9B2")); // Bulletproof Green
+        }
     }
 
     @Override
@@ -65,13 +83,16 @@ public class CredentialAdapter extends RecyclerView.Adapter<CredentialAdapter.Cr
 
     // --- THE INNER CLASS IS SEPARATED DOWN HERE ---
     class CredentialHolder extends RecyclerView.ViewHolder {
-        private TextView textViewTitle;
-        private TextView textViewUsername;
+        private android.widget.TextView textViewTitle;
+        private android.widget.TextView textViewUsername;
+        private android.widget.TextView textHealthBadge;
 
         public CredentialHolder(View itemView) {
             super(itemView);
-            textViewTitle = itemView.findViewById(R.id.text_view_title);
-            textViewUsername = itemView.findViewById(R.id.text_view_username);
+            // Notice we removed "_view" from these two IDs so they match the XML perfectly!
+            textViewTitle = itemView.findViewById(R.id.text_title);
+            textViewUsername = itemView.findViewById(R.id.text_username);
+            textHealthBadge = itemView.findViewById(R.id.text_health_badge);
 
             itemView.setOnClickListener(v -> {
                 int position = getAdapterPosition();

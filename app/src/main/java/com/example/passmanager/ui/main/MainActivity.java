@@ -89,7 +89,18 @@ public class MainActivity extends AppCompatActivity {
                 fabAdd.setVisibility(View.VISIBLE);
                 searchBar.setVisibility(View.VISIBLE);
                 return true;
-            } else if (itemId == R.id.nav_security || itemId == R.id.nav_about) {
+            } else if (itemId == R.id.nav_security) {
+                // --- NEW: Load the Security Fragment ---
+                recyclerView.setVisibility(View.GONE);
+                fabAdd.setVisibility(View.GONE);
+                searchBar.setVisibility(View.GONE);
+                fragmentContainer.setVisibility(View.VISIBLE);
+
+                getSupportFragmentManager().beginTransaction()
+                        .replace(R.id.fragment_container, new SecurityFragment())
+                        .commit();
+                return true;
+            } else if (itemId == R.id.nav_about) {
                 Toast.makeText(MainActivity.this, "Coming soon", Toast.LENGTH_SHORT).show();
                 return true;
             }
@@ -124,25 +135,52 @@ public class MainActivity extends AppCompatActivity {
             });
         });
 
+        // --- 7. ITEM ACTIONS (CLICK & SWIPE) ---
+        // ... (Keep your adapter.setOnItemClickListener block as it is) ...
+
         new ItemTouchHelper(new ItemTouchHelper.SimpleCallback(0, ItemTouchHelper.LEFT | ItemTouchHelper.RIGHT) {
             @Override
-            public boolean onMove(@NonNull RecyclerView recyclerView, @NonNull RecyclerView.ViewHolder viewHolder, @NonNull RecyclerView.ViewHolder target) { return false; }
+            public boolean onMove(@NonNull RecyclerView recyclerView, @NonNull RecyclerView.ViewHolder viewHolder, @NonNull RecyclerView.ViewHolder target) {
+                return false;
+            }
+
             @Override
             public void onSwiped(@NonNull RecyclerView.ViewHolder viewHolder, int direction) {
                 int position = viewHolder.getAdapterPosition();
-                com.example.passmanager.data.model.Credential credentialToDelete = adapter.getCredentialAt(position);
+                com.example.passmanager.data.model.Credential targetCredential = adapter.getCredentialAt(position);
+
+                // Instantly bounce the item back into the list while we process the action
                 adapter.notifyItemChanged(position);
-                authenticateUser(() -> {
-                    new MaterialAlertDialogBuilder(MainActivity.this)
-                            .setTitle("Delete Password?")
-                            .setMessage("Are you sure you want to delete " + credentialToDelete.getTitle() + "?")
-                            .setPositiveButton("Delete", (dialog, which) -> {
-                                vaultViewModel.delete(credentialToDelete);
-                                Toast.makeText(MainActivity.this, "Deleted", Toast.LENGTH_SHORT).show();
-                            })
-                            .setNegativeButton("Cancel", (dialog, which) -> dialog.dismiss())
-                            .show();
-                });
+
+                if (direction == ItemTouchHelper.RIGHT) {
+                    // --- SWIPE RIGHT: DELETE ---
+                    authenticateUser(() -> {
+                        new MaterialAlertDialogBuilder(MainActivity.this)
+                                .setTitle("Delete Password?")
+                                .setMessage("Are you sure you want to delete " + targetCredential.getTitle() + "?")
+                                .setPositiveButton("Delete", (dialog, which) -> {
+                                    vaultViewModel.delete(targetCredential);
+                                    Toast.makeText(MainActivity.this, "Deleted", Toast.LENGTH_SHORT).show();
+                                })
+                                .setNegativeButton("Cancel", (dialog, which) -> dialog.dismiss())
+                                .show();
+                    });
+
+                } else if (direction == ItemTouchHelper.LEFT) {
+                    // --- SWIPE LEFT: EDIT ---
+                    authenticateUser(() -> {
+                        android.content.Intent intent = new android.content.Intent(MainActivity.this, EditCredentialActivity.class);
+
+                        // Package up the old data to send to the Edit Screen
+                        intent.putExtra("CREDENTIAL_ID", targetCredential.getId());
+                        intent.putExtra("CREDENTIAL_TITLE", targetCredential.getTitle());
+                        intent.putExtra("CREDENTIAL_USERNAME", targetCredential.getUsername());
+                        intent.putExtra("CREDENTIAL_ENCRYPTED_PW", targetCredential.getEncryptedPassword());
+                        intent.putExtra("CREDENTIAL_IV", targetCredential.getEncryptionIv());
+
+                        startActivity(intent);
+                    });
+                }
             }
         }).attachToRecyclerView(recyclerView);
 
@@ -178,5 +216,45 @@ public class MainActivity extends AppCompatActivity {
                 .setAllowedAuthenticators(androidx.biometric.BiometricManager.Authenticators.BIOMETRIC_STRONG | androidx.biometric.BiometricManager.Authenticators.DEVICE_CREDENTIAL)
                 .build();
         biometricPrompt.authenticate(promptInfo);
+    }
+    @Override
+    protected void onStart() {
+        super.onStart();
+        android.content.SharedPreferences prefs = getSharedPreferences("VaultSecurityPrefs", MODE_PRIVATE);
+
+        long lastBackgroundTime = prefs.getLong("LAST_BACKGROUND_TIME", 0);
+        long timeoutSetting = prefs.getLong("AUTO_LOCK_TIMEOUT", 0); // Default is 0 (Immediately)
+
+        // If the user just opened the app for the first time, lastBackgroundTime is 0.
+        // We only check for a lock if they are returning from the background.
+        if (lastBackgroundTime > 0 && timeoutSetting != -1) {
+
+            long timeAway = System.currentTimeMillis() - lastBackgroundTime;
+
+            if (timeAway >= timeoutSetting) {
+                // LOCK TRIGGERED!
+                // 1. Hide the Vault contents immediately to prevent visual leaks
+                findViewById(R.id.recyclerView_credentials).setVisibility(View.GONE);
+                findViewById(R.id.fragment_container).setVisibility(View.GONE);
+
+                // 2. Throw the Biometric Prompt
+                authenticateUser(() -> {
+                    // 3. On Success: Restore the UI based on what tab they were on
+                    BottomNavigationView bottomNav = findViewById(R.id.bottom_navigation);
+                    bottomNav.setSelectedItemId(bottomNav.getSelectedItemId()); // Refreshes current tab
+
+                    // Reset the background timer so it doesn't instantly lock again
+                    prefs.edit().putLong("LAST_BACKGROUND_TIME", 0).apply();
+                });
+            }
+        }
+    }
+
+    @Override
+    protected void onStop() {
+        super.onStop();
+        // The moment the app goes to the background, stamp the current time
+        android.content.SharedPreferences prefs = getSharedPreferences("VaultSecurityPrefs", MODE_PRIVATE);
+        prefs.edit().putLong("LAST_BACKGROUND_TIME", System.currentTimeMillis()).apply();
     }
 }

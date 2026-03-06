@@ -31,6 +31,7 @@ public class SecurityFragment extends Fragment {
 
     private SharedPreferences sharedPreferences;
     private TextView textAutoLockStatus;
+    private List<com.example.passmanager.data.model.AuditLog> currentLogs = new java.util.ArrayList<>();
 
     // NEW: Store the vault data in memory for the audit
     private List<Credential> currentVault = new ArrayList<>();
@@ -54,6 +55,13 @@ public class SecurityFragment extends Fragment {
             }
         });
 
+        com.example.passmanager.data.local.VaultDatabase.getDatabase(requireContext())
+                .auditLogDao().getAllLogs().observe(getViewLifecycleOwner(), logs -> {
+                    if (logs != null) {
+                        currentLogs = logs;
+                    }
+                });
+
         // --- 1. STEALTH MODE TOGGLE ---
         SwitchMaterial switchStealthMode = view.findViewById(R.id.switch_stealth_mode);
         boolean isStealthEnabled = sharedPreferences.getBoolean("STEALTH_MODE", true);
@@ -69,7 +77,6 @@ public class SecurityFragment extends Fragment {
                 Toast.makeText(getContext(), "Stealth Mode Disabled", Toast.LENGTH_SHORT).show();
             }
         });
-
         // --- 2. AUTO-LOCK TIMEOUT ---
         long currentTimeout = sharedPreferences.getLong("AUTO_LOCK_TIMEOUT", 0);
         updateAutoLockText(currentTimeout);
@@ -80,6 +87,9 @@ public class SecurityFragment extends Fragment {
         // --- 3. PASSWORD REUSE SCANNER ---
         View btnReuseScanner = view.findViewById(R.id.btn_reuse_scanner);
         btnReuseScanner.setOnClickListener(v -> runReuseAudit());
+
+        View btnAuditLog = view.findViewById(R.id.btn_audit_log);
+        btnAuditLog.setOnClickListener(v -> showAuditLogDialog());
 
         return view;
     }
@@ -165,5 +175,33 @@ public class SecurityFragment extends Fragment {
             e.printStackTrace();
             Toast.makeText(getContext(), "Audit Failed: Decryption Error", Toast.LENGTH_SHORT).show();
         }
+    }
+    private void showAuditLogDialog() {
+        if (currentLogs.isEmpty()) {
+            Toast.makeText(getContext(), "No logs available.", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        StringBuilder report = new StringBuilder();
+        // Format the raw milliseconds into a clean Date/Time
+        java.text.SimpleDateFormat sdf = new java.text.SimpleDateFormat("MMM dd, yyyy - HH:mm:ss", java.util.Locale.getDefault());
+
+        // Loop through the most recent 20 logs to prevent the dialog from getting too massive
+        int limit = Math.min(currentLogs.size(), 20);
+        for (int i = 0; i < limit; i++) {
+            com.example.passmanager.data.model.AuditLog log = currentLogs.get(i);
+
+            String date = sdf.format(new java.util.Date(log.getTimestamp()));
+            String status = log.isSuccessful() ? "✅ SUCCESS" : "❌ FAILED";
+
+            report.append(date).append("\n");
+            report.append("Method: ").append(log.getEventType()).append(" | ").append(status).append("\n\n");
+        }
+
+        new MaterialAlertDialogBuilder(requireContext())
+                .setTitle("Access Audit Log")
+                .setMessage(report.toString().trim())
+                .setPositiveButton("Close", null)
+                .show();
     }
 }

@@ -102,26 +102,58 @@
         app:cardElevation="2dp">
 
         <LinearLayout
-            android:id="@+id/btn_reuse_scanner"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:orientation="vertical"
-            android:padding="16dp"
-            android:clickable="true"
-            android:focusable="true">
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="Run Password Reuse Audit"
-                android:textColor="@color/vault_accent"
-                android:textSize="16sp"
-                android:textStyle="bold"/>
-            <TextView
+            android:orientation="vertical">
+
+            <LinearLayout
+                android:id="@+id/btn_reuse_scanner"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text="Scan your vault for duplicate passwords across different services."
-                android:textColor="@color/vault_text_secondary"
-                android:textSize="12sp"/>
+                android:orientation="vertical"
+                android:padding="16dp"
+                android:clickable="true"
+                android:focusable="true">
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Run Password Reuse Audit"
+                    android:textColor="@color/vault_accent"
+                    android:textSize="16sp"
+                    android:textStyle="bold"/>
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="Scan your vault for duplicate passwords."
+                    android:textColor="@color/vault_text_secondary"
+                    android:textSize="12sp"/>
+            </LinearLayout>
+
+            <View android:layout_width="match_parent" android:layout_height="1dp" android:background="#333333" android:layout_marginHorizontal="16dp"/>
+
+            <LinearLayout
+                android:id="@+id/btn_audit_log"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="16dp"
+                android:clickable="true"
+                android:focusable="true">
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="View Access Audit Log"
+                    android:textColor="@color/vault_accent"
+                    android:textSize="16sp"
+                    android:textStyle="bold"/>
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="Review recent successful and failed unlock attempts."
+                    android:textColor="@color/vault_text_secondary"
+                    android:textSize="12sp"/>
+            </LinearLayout>
+
         </LinearLayout>
     </com.google.android.material.card.MaterialCardView>
 

@@ -40,6 +40,8 @@ public class MainActivity extends AppCompatActivity {
         // SECURITY: Block screenshots
         getWindow().setFlags(WindowManager.LayoutParams.FLAG_SECURE, WindowManager.LayoutParams.FLAG_SECURE);
         setContentView(R.layout.activity_main);
+        getSharedPreferences("VaultSecurityPrefs", MODE_PRIVATE)
+                .edit().putLong("LAST_BACKGROUND_TIME", 0).apply();
 
         // --- 1. LINK ALL UI ELEMENTS TO IDs FIRST ---
         RecyclerView recyclerView = findViewById(R.id.recyclerView_credentials);

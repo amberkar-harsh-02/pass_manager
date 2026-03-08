@@ -1,5 +1,6 @@
 package com.example.passmanager.ui.main;
 
+import android.content.Context;
 import android.os.Bundle;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -26,7 +27,7 @@ public class HomeFragment extends Fragment {
     private TextView textTotalPasswords;
     private TextView textWeakPasswords;
     private TextView textStrongPasswords;
-    private CredentialAdapter adapter; // Reusing your adapter!
+    private CredentialAdapter adapter;
 
     @Nullable
     @Override
@@ -37,27 +38,37 @@ public class HomeFragment extends Fragment {
         textWeakPasswords = view.findViewById(R.id.text_weak_passwords);
         textStrongPasswords = view.findViewById(R.id.text_strong_passwords);
 
-        // --- NEW: Setup the Vulnerability List ---
+        // --- Setup the Vulnerability List ---
         RecyclerView recyclerView = view.findViewById(R.id.recyclerView_vulnerabilities);
         recyclerView.setLayoutManager(new LinearLayoutManager(getContext()));
         adapter = new CredentialAdapter();
         recyclerView.setAdapter(adapter);
 
+        // --- CHECK THREAT LEVEL ---
+        boolean isDuressMode = requireActivity().getSharedPreferences("VaultSecurityPrefs", Context.MODE_PRIVATE)
+                .getBoolean("IS_DURESS_MODE", false);
+
         vaultViewModel = new ViewModelProvider(requireActivity()).get(VaultViewModel.class);
 
         vaultViewModel.getAllCredentials().observe(getViewLifecycleOwner(), credentials -> {
-            if (credentials != null) {
+            if (isDuressMode) {
+                // THE ILLUSION: Hardcode everything to zero and clear the list
+                textTotalPasswords.setText("0");
+                textWeakPasswords.setText("0");
+                textStrongPasswords.setText("0");
+                adapter.setCredentials(new ArrayList<>());
+            } else if (credentials != null) {
+                // REAL MODE: Calculate actual security scores
                 int total = credentials.size();
                 int weakCount = 0;
                 int strongCount = 0;
 
-                // This list will hold ONLY the weak passwords
                 List<Credential> vulnerableList = new ArrayList<>();
 
                 for (Credential cred : credentials) {
                     if (cred.getHealthScore() <= 1) {
                         weakCount++;
-                        vulnerableList.add(cred); // Add to the threat list
+                        vulnerableList.add(cred);
                     } else {
                         strongCount++;
                     }
@@ -67,22 +78,18 @@ public class HomeFragment extends Fragment {
                 textWeakPasswords.setText(String.valueOf(weakCount));
                 textStrongPasswords.setText(String.valueOf(strongCount));
 
-                // Push only the weak passwords to the screen
                 adapter.setCredentials(vulnerableList);
             }
         });
 
-        // For now, clicking an item just tells the user they need to edit it
+        // Click to edit vulnerable passwords
         adapter.setOnItemClickListener(credential -> {
             android.content.Intent intent = new android.content.Intent(getContext(), EditCredentialActivity.class);
-
-            // Package up the old data to send to the Edit Screen
             intent.putExtra("CREDENTIAL_ID", credential.getId());
             intent.putExtra("CREDENTIAL_TITLE", credential.getTitle());
             intent.putExtra("CREDENTIAL_USERNAME", credential.getUsername());
             intent.putExtra("CREDENTIAL_ENCRYPTED_PW", credential.getEncryptedPassword());
             intent.putExtra("CREDENTIAL_IV", credential.getEncryptionIv());
-
             startActivity(intent);
         });
 

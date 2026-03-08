@@ -39,16 +39,29 @@ public class MainActivity extends AppCompatActivity {
 
         // SECURITY: Block screenshots
         getWindow().setFlags(WindowManager.LayoutParams.FLAG_SECURE, WindowManager.LayoutParams.FLAG_SECURE);
+
+        // 1. PAINT THE SCREEN FIRST!
         setContentView(R.layout.activity_main);
+
+        // Fix Double Prompt from Gatekeeper
         getSharedPreferences("VaultSecurityPrefs", MODE_PRIVATE)
                 .edit().putLong("LAST_BACKGROUND_TIME", 0).apply();
 
-        // --- 1. LINK ALL UI ELEMENTS TO IDs FIRST ---
+        // --- CHECK THREAT LEVEL ---
+        boolean isDuressMode = getSharedPreferences("VaultSecurityPrefs", MODE_PRIVATE)
+                .getBoolean("IS_DURESS_MODE", false);
+
+        // --- 1. LINK ALL UI ELEMENTS TO IDs ---
         RecyclerView recyclerView = findViewById(R.id.recyclerView_credentials);
         FloatingActionButton fabAdd = findViewById(R.id.fab_add_password);
         searchBar = findViewById(R.id.edit_text_search);
         FrameLayout fragmentContainer = findViewById(R.id.fragment_container);
         BottomNavigationView bottomNav = findViewById(R.id.bottom_navigation);
+
+        // THE PHANTOM TAB: Dynamically erase the Security tab from the UI if compromised
+        if (isDuressMode) {
+            bottomNav.getMenu().removeItem(R.id.nav_security);
+        }
 
         // --- 2. SETUP RECYCLERVIEW & ADAPTER ---
         recyclerView.setLayoutManager(new LinearLayoutManager(this));
@@ -59,8 +72,15 @@ public class MainActivity extends AppCompatActivity {
         // --- 3. DATABASE OBSERVER ---
         vaultViewModel = new ViewModelProvider(this).get(VaultViewModel.class);
         vaultViewModel.getAllCredentials().observe(this, credentials -> {
-            allCredentials = credentials;
-            adapter.setCredentials(credentials); // This ensures the list actually populates
+            if (isDuressMode) {
+                // THE ILLUSION: Give them a completely empty vault
+                allCredentials = new java.util.ArrayList<>();
+                adapter.setCredentials(new java.util.ArrayList<>());
+            } else {
+                // REAL MODE: Load actual passwords
+                allCredentials = credentials;
+                adapter.setCredentials(credentials);
+            }
         });
 
         // --- 4. SEARCH BAR LOGIC ---
@@ -88,8 +108,14 @@ public class MainActivity extends AppCompatActivity {
             } else if (itemId == R.id.nav_vault) {
                 fragmentContainer.setVisibility(View.GONE);
                 recyclerView.setVisibility(View.VISIBLE);
-                fabAdd.setVisibility(View.VISIBLE);
                 searchBar.setVisibility(View.VISIBLE);
+
+                // Only show the Add button if we are NOT in Duress Mode
+                if (!isDuressMode) {
+                    fabAdd.setVisibility(View.VISIBLE);
+                } else {
+                    fabAdd.setVisibility(View.GONE);
+                }
                 return true;
             } else if (itemId == R.id.nav_security) {
                 // --- NEW: Load the Security Fragment ---
@@ -136,9 +162,6 @@ public class MainActivity extends AppCompatActivity {
                 }
             });
         });
-
-        // --- 7. ITEM ACTIONS (CLICK & SWIPE) ---
-        // ... (Keep your adapter.setOnItemClickListener block as it is) ...
 
         new ItemTouchHelper(new ItemTouchHelper.SimpleCallback(0, ItemTouchHelper.LEFT | ItemTouchHelper.RIGHT) {
             @Override
@@ -219,6 +242,7 @@ public class MainActivity extends AppCompatActivity {
                 .build();
         biometricPrompt.authenticate(promptInfo);
     }
+
     @Override
     protected void onStart() {
         super.onStart();

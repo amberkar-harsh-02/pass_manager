@@ -140,11 +140,23 @@ public class LockScreenActivity extends AppCompatActivity {
 
         } else if (currentState.equals("UNLOCK")) {
             String savedPinHash = prefs.getString("MASTER_PIN_HASH", "");
+            String savedDuressHash = prefs.getString("DURESS_PIN_HASH", ""); // Grab the Duress Hash
             String enteredHash = hashPin(enteredPin);
 
             if (enteredHash != null && enteredHash.equals(savedPinHash)) {
-                unlockVault(true); // True because they proved they know the PIN
+                // REAL MASTER PIN ENTERED
+                prefs.edit().putBoolean("IS_DURESS_MODE", false).apply(); // Ensure real mode
+                logAccessAttempt("PIN_MASTER", true);
+                unlockVault(true);
+
+            } else if (enteredHash != null && !savedDuressHash.isEmpty() && enteredHash.equals(savedDuressHash)) {
+                // DURESS PIN ENTERED! Deploy the illusion.
+                prefs.edit().putBoolean("IS_DURESS_MODE", true).apply(); // Flag the app as compromised
+                logAccessAttempt("PIN_DURESS", true); // Silently log that a duress event occurred
+                unlockVault(true);
+
             } else {
+                // WRONG PIN
                 logAccessAttempt("PIN", false);
                 Toast.makeText(this, "Incorrect PIN", Toast.LENGTH_SHORT).show();
                 resetPad();

@@ -90,7 +90,8 @@ public class SecurityFragment extends Fragment {
 
         View btnAuditLog = view.findViewById(R.id.btn_audit_log);
         btnAuditLog.setOnClickListener(v -> showAuditLogDialog());
-
+        View btnSetupDuress = view.findViewById(R.id.btn_setup_duress);
+        btnSetupDuress.setOnClickListener(v -> showDuressPinDialog());
         return view;
     }
 
@@ -203,5 +204,50 @@ public class SecurityFragment extends Fragment {
                 .setMessage(report.toString().trim())
                 .setPositiveButton("Close", null)
                 .show();
+    }
+    private void showDuressPinDialog() {
+        // Create a programmatic EditText for the dialog
+        final android.widget.EditText input = new android.widget.EditText(requireContext());
+        input.setInputType(android.text.InputType.TYPE_CLASS_NUMBER | android.text.InputType.TYPE_NUMBER_VARIATION_PASSWORD);
+        input.setHint("Enter 4-digit PIN");
+        input.setFilters(new android.text.InputFilter[] { new android.text.InputFilter.LengthFilter(4) });
+
+        // Add some padding so it looks clean inside the dialog
+        android.widget.FrameLayout container = new android.widget.FrameLayout(requireContext());
+        android.widget.FrameLayout.LayoutParams params = new android.widget.FrameLayout.LayoutParams(
+                android.view.ViewGroup.LayoutParams.MATCH_PARENT, android.view.ViewGroup.LayoutParams.WRAP_CONTENT);
+        params.setMargins(50, 20, 50, 0);
+        input.setLayoutParams(params);
+        container.addView(input);
+
+        new com.google.android.material.dialog.MaterialAlertDialogBuilder(requireContext())
+                .setTitle("Set Duress PIN")
+                .setMessage("Make sure this is different from your Master PIN.")
+                .setView(container)
+                .setPositiveButton("Save", (dialog, which) -> {
+                    String pin = input.getText().toString();
+                    if(pin.length() == 4) {
+                        // Hash it so it's safely stored!
+                        String hashed = hashPin(pin);
+                        sharedPreferences.edit().putString("DURESS_PIN_HASH", hashed).apply();
+                        android.widget.Toast.makeText(getContext(), "Duress PIN Secured", android.widget.Toast.LENGTH_SHORT).show();
+                    } else {
+                        android.widget.Toast.makeText(getContext(), "PIN must be exactly 4 digits", android.widget.Toast.LENGTH_SHORT).show();
+                    }
+                })
+                .setNegativeButton("Cancel", null)
+                .show();
+    }
+
+    private String hashPin(String plainPin) {
+        try {
+            java.security.MessageDigest digest = java.security.MessageDigest.getInstance("SHA-256");
+            digest.update("LedgerVaultSalt2026".getBytes(java.nio.charset.StandardCharsets.UTF_8));
+            byte[] hash = digest.digest(plainPin.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+            return android.util.Base64.encodeToString(hash, android.util.Base64.NO_WRAP);
+        } catch (Exception e) {
+            e.printStackTrace();
+            return null;
+        }
     }
 }

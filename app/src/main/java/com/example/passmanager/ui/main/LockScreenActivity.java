@@ -74,7 +74,7 @@ public class LockScreenActivity extends AppCompatActivity {
                 findViewById(R.id.btn_fingerprint).setVisibility(View.INVISIBLE);
             } else {
                 // Safe to use biometrics! Auto-launch the prompt.
-                showBiometricPrompt();
+                textSubtitle.setText("Enter PIN or tap icon for fingerprint");
             }
         }
     }
@@ -130,7 +130,7 @@ public class LockScreenActivity extends AppCompatActivity {
                 String hashedPin = hashPin(enteredPin);
                 prefs.edit().putString("MASTER_PIN_HASH", hashedPin).apply();
                 Toast.makeText(this, "PIN Secured & Saved!", Toast.LENGTH_SHORT).show();
-                unlockVault(true); // True because they successfully used the PIN
+                unlockVault(true, false); // True because they successfully used the PIN
             } else {
                 Toast.makeText(this, "PINs do not match. Try again.", Toast.LENGTH_SHORT).show();
                 currentState = "CREATE_PIN";
@@ -140,23 +140,20 @@ public class LockScreenActivity extends AppCompatActivity {
 
         } else if (currentState.equals("UNLOCK")) {
             String savedPinHash = prefs.getString("MASTER_PIN_HASH", "");
-            String savedDuressHash = prefs.getString("DURESS_PIN_HASH", ""); // Grab the Duress Hash
+            String savedDuressHash = prefs.getString("DURESS_PIN_HASH", "");
             String enteredHash = hashPin(enteredPin);
 
             if (enteredHash != null && enteredHash.equals(savedPinHash)) {
-                // REAL MASTER PIN ENTERED
-                prefs.edit().putBoolean("IS_DURESS_MODE", false).apply(); // Ensure real mode
+                // REAL MASTER PIN
                 logAccessAttempt("PIN_MASTER", true);
-                unlockVault(true);
+                unlockVault(true, false); // <-- Pass false for isDuress
 
             } else if (enteredHash != null && !savedDuressHash.isEmpty() && enteredHash.equals(savedDuressHash)) {
                 // DURESS PIN ENTERED! Deploy the illusion.
-                prefs.edit().putBoolean("IS_DURESS_MODE", true).apply(); // Flag the app as compromised
-                logAccessAttempt("PIN_DURESS", true); // Silently log that a duress event occurred
-                unlockVault(true);
+                logAccessAttempt("PIN_DURESS", true);
+                unlockVault(true, true); // <-- Pass true for isDuress
 
             } else {
-                // WRONG PIN
                 logAccessAttempt("PIN", false);
                 Toast.makeText(this, "Incorrect PIN", Toast.LENGTH_SHORT).show();
                 resetPad();
@@ -186,8 +183,8 @@ public class LockScreenActivity extends AppCompatActivity {
             @Override
             public void onAuthenticationSucceeded(@NonNull BiometricPrompt.AuthenticationResult result) {
                 super.onAuthenticationSucceeded(result);
-                logAccessAttempt("BIOMETRIC", true); // <-- NEW: Log Success
-                unlockVault(false);
+                logAccessAttempt("BIOMETRIC", true);
+                unlockVault(false, false); // <-- Biometrics always open the real vault
             }
 
             @Override
@@ -207,12 +204,13 @@ public class LockScreenActivity extends AppCompatActivity {
         biometricPrompt.authenticate(promptInfo);
     }
 
-    private void unlockVault(boolean resetPinTimer) {
+    private void unlockVault(boolean resetPinTimer, boolean isDuress) {
         if (resetPinTimer) {
             prefs.edit().putLong("LAST_SUCCESSFUL_PIN", System.currentTimeMillis()).apply();
         }
 
         Intent intent = new Intent(LockScreenActivity.this, MainActivity.class);
+        intent.putExtra("IS_DURESS_MODE", isDuress); // <-- THE VOLATILE MEMORY FIX
         startActivity(intent);
         finish();
     }

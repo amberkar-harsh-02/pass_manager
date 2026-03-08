@@ -48,8 +48,8 @@ public class MainActivity extends AppCompatActivity {
                 .edit().putLong("LAST_BACKGROUND_TIME", 0).apply();
 
         // --- CHECK THREAT LEVEL ---
-        boolean isDuressMode = getSharedPreferences("VaultSecurityPrefs", MODE_PRIVATE)
-                .getBoolean("IS_DURESS_MODE", false);
+        // --- CHECK THREAT LEVEL (VOLATILE MEMORY) ---
+        boolean isDuressMode = getIntent().getBooleanExtra("IS_DURESS_MODE", false);
 
         // --- 1. LINK ALL UI ELEMENTS TO IDs ---
         RecyclerView recyclerView = findViewById(R.id.recyclerView_credentials);

@@ -45,8 +45,7 @@ public class HomeFragment extends Fragment {
         recyclerView.setAdapter(adapter);
 
         // --- CHECK THREAT LEVEL ---
-        boolean isDuressMode = requireActivity().getSharedPreferences("VaultSecurityPrefs", Context.MODE_PRIVATE)
-                .getBoolean("IS_DURESS_MODE", false);
+        boolean isDuressMode = requireActivity().getIntent().getBooleanExtra("IS_DURESS_MODE", false);
 
         vaultViewModel = new ViewModelProvider(requireActivity()).get(VaultViewModel.class);
 

@@ -1,22 +1,126 @@
 <!DOCTYPE html>
 <html>
 <head>
+    <meta charset="UTF-8">
     <style>
-        body { width: 250px; text-align: center; font-family: sans-serif; padding: 10px; }
-        #qr-container { margin-top: 15px; }
-        img { width: 200px; height: 200px; }
-        .status { margin-top: 10px; font-size: 12px; color: #555; }
+        /* --- YOUR THEME CONTROL PANEL --- */
+        :root {
+          /* Change these hex codes to match your Android colors.xml! */
+          --app-bg: #121212;          /* The main background (Dark Gray/Black) */
+          --app-surface: #1E1E1E;     /* The secondary background for cards */
+          --primary-accent: #6200EE;  /* Your main brand color (Default: Android Purple) */
+          --text-main: #FFFFFF;       /* Primary text color */
+          --text-sub: #A0A0A0;        /* Secondary text color */
+          --success: #03DAC6;         /* The green 'Delivered' color */
+          --error: #CF6679;           /* The red 'Failed' color */
+        }
+
+        body {
+          width: 280px;
+          margin: 0;
+          padding: 24px 20px;
+          background-color: var(--app-bg);
+          color: var(--text-main);
+          font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+          text-align: center;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+        }
+
+        .header {
+          margin-bottom: 20px;
+        }
+
+        .header h2 {
+          margin: 0;
+          font-size: 22px;
+          font-weight: 600;
+          letter-spacing: 0.5px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          gap: 8px;
+        }
+
+        /* A sleek shield icon for the branding */
+        .header h2::before {
+          font-size: 24px;
+        }
+
+        .subtitle {
+          font-size: 13px;
+          color: var(--text-sub);
+          margin-top: 6px;
+          line-height: 1.4;
+        }
+
+        /* The QR Code MUST have a white background to be scannable by cameras */
+        #qr-container {
+          background-color: #FFFFFF;
+          padding: 16px;
+          border-radius: 16px;
+          box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+          margin: 0 0 24px 0;
+          display: flex;
+          justify-content: center;
+          align-items: center;
+          width: 200px;
+          height: 200px;
+          box-sizing: border-box;
+        }
+
+        #qr-code {
+          width: 100%;
+          height: 100%;
+          image-rendering: crisp-edges; /* Keeps the QR pixels sharp */
+        }
+
+        /* The dynamic status pill at the bottom */
+        .status-badge {
+          font-size: 14px;
+          font-weight: 600;
+          padding: 10px 16px;
+          border-radius: 8px;
+          width: 100%;
+          box-sizing: border-box;
+          transition: all 0.3s ease;
+          background-color: var(--app-surface);
+          color: var(--text-sub);
+          border: 1px solid transparent;
+        }
+
+        /* Dynamic states injected by JavaScript */
+        .status-badge.waiting {
+          color: var(--primary-accent);
+          border-color: var(--primary-accent);
+          background-color: rgba(98, 0, 238, 0.1); /* Faded accent background */
+        }
+
+        .status-badge.success {
+          color: #000000;
+          background-color: var(--success);
+          border-color: var(--success);
+        }
+
+        .status-badge.error {
+          color: #FFFFFF;
+          background-color: var(--error);
+          border-color: var(--error);
+        }
     </style>
 </head>
 <body>
-<h3>Ledger Bridge</h3>
-<p style="font-size: 12px;">Scan with your Ledger App to securely inject credentials.</p>
-
-<div id="qr-container">
-    <img id="qr-code" src="" alt="Waiting for connection..." style="display: none;"/>
+<div class="header">
+    <h2>Ledger</h2>
+    <div class="subtitle">Scan with your phone to bridge credentials.</div>
 </div>
 
-<div id="status-text" class="status">Connecting to Relay...</div>
+<div id="qr-container">
+    <img id="qr-code" src="" alt="Loading..." style="display: none;"/>
+</div>
+
+<div id="status-text" class="status-badge">Connecting to Node...</div>
 
 <script src="popup.js"></script>
 </body>

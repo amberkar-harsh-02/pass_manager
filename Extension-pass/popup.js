@@ -11,11 +11,12 @@ const socket = new WebSocket(RELAY_URL);
 
 socket.onerror = function() {
     statusText.innerText = "Connection Failed.";
-    statusText.style.color = "red";
+    statusText.className = "status-badge error"; // Uses the red theme
 };
 
 socket.onopen = function() {
     statusText.innerText = "Awaiting Payload...";
+    statusText.className = "status-badge waiting";
 
     const qrData = JSON.stringify({ room: roomId, key: sessionKey });
     qrImage.src = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(qrData)}`;
@@ -23,41 +24,59 @@ socket.onopen = function() {
 };
 
 socket.onmessage = function(event) {
-    // 1. THE WIRETAP: Print literally everything the server sends us
-    console.log("📡 RAW DATA RECEIVED FROM PIEHOST:", event.data);
-
     try {
         const incomingData = JSON.parse(event.data);
-        console.log("🧩 PARSED JSON:", incomingData);
 
-        // Check if the room matches
-        if (incomingData.room === roomId) {
-            console.log("✅ Room matched! Payload:", incomingData.password);
-
-            statusText.innerText = "Payload Received! Injecting...";
-            statusText.style.color = "green";
+        if (incomingData.room === roomId && incomingData.password) {
+                    statusText.innerText = "Target Injected!";
+                    statusText.className = "status-badge success";
 
             chrome.tabs.query({active: true, currentWindow: true}, function(tabs) {
                 chrome.scripting.executeScript({
                     target: {tabId: tabs[0].id},
-                    func: injectPasswordIntoPage,
-                    args: [incomingData.password]
+                    func: injectCredentials,
+                    // Pass BOTH arguments to the injected script
+                    args: [incomingData.username, incomingData.password]
                 });
             });
-        } else {
-            console.warn("⚠️ Ignored message. Wrong room. Expected:", roomId, "Got:", incomingData.room);
         }
     } catch (e) {
-        console.error("❌ JSON Parse Error. The server sent text we couldn't read:", e);
+        console.error("JSON Parse Error", e);
     }
 };
 
-function injectPasswordIntoPage(password) {
-    const passwordFields = document.querySelectorAll('input[type="password"]');
-    if (passwordFields.length > 0) {
-        passwordFields[0].value = password;
-        alert("Ledger Payload Injected!");
+// --- THE PROXIMITY HEURISTIC ---
+function injectCredentials(username, password) {
+    // 1. Grab every single input field on the page
+    const inputs = Array.from(document.querySelectorAll('input'));
+
+    // 2. Find the exact index of the Password field
+    const passIndex = inputs.findIndex(input => input.type.toLowerCase() === 'password');
+
+    if (passIndex !== -1) {
+        const passField = inputs[passIndex];
+
+        // Inject Password and trigger React/Angular state update
+        passField.value = password;
+        passField.dispatchEvent(new Event('input', { bubbles: true }));
+        passField.dispatchEvent(new Event('change', { bubbles: true }));
+
+        // 3. Walk BACKWARDS up the DOM from the password field to find the username
+        for (let i = passIndex - 1; i >= 0; i--) {
+            const type = inputs[i].type.toLowerCase();
+            const isVisible = inputs[i].style.display !== 'none' && inputs[i].type !== 'hidden';
+
+            // The first visible text or email box right above the password is our target
+            if ((type === 'text' || type === 'email') && isVisible) {
+                const userField = inputs[i];
+                userField.value = username;
+                userField.dispatchEvent(new Event('input', { bubbles: true }));
+                userField.dispatchEvent(new Event('change', { bubbles: true }));
+                break; // Stop looking once we fill it
+            }
+        }
+        alert("VaultShield Credentials Injected!");
     } else {
-        alert("Ledger Error: No password field found on this page.");
+        alert("VaultShield Error: No password field found on this page.");
     }
 }

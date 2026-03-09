@@ -1,5 +1,6 @@
 package com.example.passmanager.ui.main;
 
+import android.graphics.Bitmap;
 import android.os.Bundle;
 import android.view.View;
 import android.view.WindowManager;
@@ -16,6 +17,8 @@ import androidx.recyclerview.widget.ItemTouchHelper;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
+import com.example.passmanager.PortraitCaptureActivity;
+import com.example.passmanager.QRCodeHelper;
 import com.example.passmanager.R;
 import com.example.passmanager.security.EncryptionUtil;
 import com.example.passmanager.ui.viewmodel.VaultViewModel;
@@ -32,6 +35,8 @@ public class MainActivity extends AppCompatActivity {
     private VaultViewModel vaultViewModel;
     private CredentialAdapter adapter;
     private EditText searchBar;
+
+    private String pendingInjectionPayload = null;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -151,14 +156,34 @@ public class MainActivity extends AppCompatActivity {
                             .setTitle(credential.getTitle())
                             .setMessage("Username: " + credential.getUsername() + "\n\nPassword: " + decryptedPassword)
                             .setPositiveButton("Close", (dialog, which) -> dialog.dismiss())
-                            .setNeutralButton("Copy Password", (dialog, which) -> {
+                            .setNeutralButton("Copy", (dialog, which) -> {
                                 android.content.ClipboardManager clipboard = (android.content.ClipboardManager) getSystemService(android.content.Context.CLIPBOARD_SERVICE);
                                 android.content.ClipData clip = android.content.ClipData.newPlainText("Vault Password", decryptedPassword);
                                 clipboard.setPrimaryClip(clip);
-                                Toast.makeText(MainActivity.this, "Copied to clipboard", Toast.LENGTH_SHORT).show();
+                                android.widget.Toast.makeText(MainActivity.this, "Copied to clipboard", android.widget.Toast.LENGTH_SHORT).show();
+                            })
+                            // --- NEW: QR CODE BRIDGE BUTTON ---
+                            .setNegativeButton("Scan to Fill", (dialog, which) -> {
+                                // 1. Save the decrypted password to RAM
+                                pendingInjectionPayload = decryptedPassword;
+
+                                // 2. Configure the Viewfinder
+                                com.journeyapps.barcodescanner.ScanOptions options = new com.journeyapps.barcodescanner.ScanOptions();
+                                options.setDesiredBarcodeFormats(com.journeyapps.barcodescanner.ScanOptions.QR_CODE);
+                                options.setPrompt("Scan the Ledger Extension QR Code");
+                                options.setCameraId(0);
+                                options.setBeepEnabled(false);
+
+                                // --- NEW: FORCE PORTRAIT MODE ---
+                                options.setCaptureActivity(PortraitCaptureActivity.class);
+                                options.setOrientationLocked(true);
+
+                                // 3. Launch the Camera
+                                barcodeLauncher.launch(options);
                             }).show();
+
                 } catch (Exception e) {
-                    Toast.makeText(MainActivity.this, "Decryption Failed!", Toast.LENGTH_SHORT).show();
+                    android.widget.Toast.makeText(MainActivity.this, "Decryption Failed!", android.widget.Toast.LENGTH_SHORT).show();
                 }
             });
         });
@@ -283,4 +308,71 @@ public class MainActivity extends AppCompatActivity {
         android.content.SharedPreferences prefs = getSharedPreferences("VaultSecurityPrefs", MODE_PRIVATE);
         prefs.edit().putLong("LAST_BACKGROUND_TIME", System.currentTimeMillis()).apply();
     }
+
+    // --- THE CAMERA SCANNER & NETWORK BRIDGE ---
+    private final androidx.activity.result.ActivityResultLauncher<com.journeyapps.barcodescanner.ScanOptions> barcodeLauncher =
+            registerForActivityResult(new com.journeyapps.barcodescanner.ScanContract(), result -> {
+
+                if (result.getContents() == null) {
+                    android.widget.Toast.makeText(this, "Scan cancelled", android.widget.Toast.LENGTH_SHORT).show();
+                    pendingInjectionPayload = null;
+                } else {
+                    // --- THE FIX: CAPTURE AND WIPE SYNCHRONOUSLY ---
+                    final String capturedPayload = pendingInjectionPayload;
+                    pendingInjectionPayload = null; // Safely wipe global buffer immediately
+
+                    if (capturedPayload == null) {
+                        android.widget.Toast.makeText(this, "Error: Payload lost from memory.", android.widget.Toast.LENGTH_SHORT).show();
+                        return;
+                    }
+
+                    try {
+                        // 1. Parse the QR Code JSON
+                        org.json.JSONObject qrData = new org.json.JSONObject(result.getContents());
+                        String targetRoom = qrData.getString("room");
+
+                        // 2. Connect to your Private Pub/Sub Relay (Ensure your PieSocket URL is here!)
+                        String RELAY_URL = "wss://s16271.nyc1.piesocket.com/v3/1?api_key=3lorUztBvwOhTfiMNJ4W3CAWJiCRAXEjWzwBciIS&notify_self=1";
+                        okhttp3.OkHttpClient client = new okhttp3.OkHttpClient();
+                        okhttp3.Request request = new okhttp3.Request.Builder().url(RELAY_URL).build();
+
+                        android.widget.Toast.makeText(this, "Firing Payload...", android.widget.Toast.LENGTH_SHORT).show();
+
+                        // 3. Fire the payload over WebSockets
+                        client.newWebSocket(request, new okhttp3.WebSocketListener() {
+                            @Override
+                            public void onOpen(okhttp3.WebSocket webSocket, okhttp3.Response response) {
+                                try {
+                                    org.json.JSONObject payloadWrapper = new org.json.JSONObject();
+                                    payloadWrapper.put("room", targetRoom);
+
+                                    // USE THE CAPTURED PAYLOAD HERE
+                                    payloadWrapper.put("password", capturedPayload);
+
+                                    webSocket.send(payloadWrapper.toString());
+
+                                    runOnUiThread(() -> android.widget.Toast.makeText(MainActivity.this, "Payload Delivered to Relay!", android.widget.Toast.LENGTH_SHORT).show());
+                                } catch (Exception e) {
+                                    e.printStackTrace();
+                                }
+                            }
+
+                            @Override
+                            public void onFailure(okhttp3.WebSocket webSocket, Throwable t, okhttp3.Response response) {
+                                if (t instanceof java.io.EOFException) {
+                                    android.util.Log.w("LedgerBridge", "Server closed connection early, but payload may have fired.");
+                                } else {
+                                    android.util.Log.e("LedgerBridge", "FATAL NETWORK CRASH: ", t);
+                                    runOnUiThread(() -> android.widget.Toast.makeText(MainActivity.this, "Network Bridge Failed.", android.widget.Toast.LENGTH_SHORT).show());
+                                }
+                            }
+                        });
+
+                    } catch (Exception e) {
+                        // Print the EXACT reason it failed to your Logcat
+                        android.util.Log.e("LedgerBridge", "Setup Failed: ", e);
+                        android.widget.Toast.makeText(this, "Error: " + e.getMessage(), android.widget.Toast.LENGTH_LONG).show();
+                    }
+                }
+            });
 }

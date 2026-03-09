@@ -1,0 +1,20 @@
+{
+  "manifest_version": 3,
+  "name": "Ledger Target",
+  "version": "1.0",
+  "description": "Zero-Knowledge QR Bridge for Ledger",
+  "permissions": [
+    "activeTab",
+    "scripting"
+  ],
+  "host_permissions": [
+    "wss://s16271.nyc1.piesocket.com/v3/1?api_key=3lorUztBvwOhTfiMNJ4W3CAWJiCRAXEjWzwBciIS&notify_self=1"
+  ],
+  "content_security_policy": {
+    "extension_pages": "script-src 'self'; object-src 'self'; connect-src 'self' wss://*.piesocket.com;"
+  },
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "Open Ledger Bridge"
+  }
+}

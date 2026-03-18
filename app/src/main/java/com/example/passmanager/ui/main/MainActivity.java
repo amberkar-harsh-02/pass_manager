@@ -20,6 +20,8 @@ import androidx.recyclerview.widget.RecyclerView;
 import com.example.passmanager.PortraitCaptureActivity;
 import com.example.passmanager.QRCodeHelper;
 import com.example.passmanager.R;
+import com.example.passmanager.SecurityUtil;
+import com.example.passmanager.data.model.Credential;
 import com.example.passmanager.security.EncryptionUtil;
 import com.example.passmanager.ui.viewmodel.VaultViewModel;
 import com.google.android.material.bottomnavigation.BottomNavigationView;
@@ -37,6 +39,8 @@ public class MainActivity extends AppCompatActivity {
     private EditText searchBar;
 
     private String pendingInjectionPayload = null;
+    private String pendingUsernamePayload = null;
+    private String pendingTitlePayload = null;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -91,14 +95,21 @@ public class MainActivity extends AppCompatActivity {
         // --- 4. SEARCH BAR LOGIC ---
         searchBar.addTextChangedListener(new android.text.TextWatcher() {
             @Override
-            public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
+            public void beforeTextChanged(CharSequence s, int start, int count, int after) {
+            }
+
             @Override
-            public void onTextChanged(CharSequence s, int start, int before, int count) {}
+            public void onTextChanged(CharSequence s, int start, int before, int count) {
+            }
+
             @Override
             public void afterTextChanged(android.text.Editable s) {
                 filterVault(s.toString());
             }
         });
+        // --- TEMPORARY SIGN-UP BUTTON ---
+        com.google.android.material.floatingactionbutton.FloatingActionButton fabGenerate = findViewById(R.id.fabGenerate);
+        fabGenerate.setOnClickListener(v -> showSignUpInjectorDialog());
 
         // --- 5. NAV BAR LOGIC ---
         bottomNav.setOnItemSelectedListener(item -> {
@@ -166,6 +177,7 @@ public class MainActivity extends AppCompatActivity {
                             .setNegativeButton("Scan to Fill", (dialog, which) -> {
                                 // 1. Save the decrypted password to RAM
                                 pendingInjectionPayload = decryptedPassword;
+                                pendingUsernamePayload = credential.getUsername();
 
                                 // 2. Configure the Viewfinder
                                 com.journeyapps.barcodescanner.ScanOptions options = new com.journeyapps.barcodescanner.ScanOptions();
@@ -309,6 +321,7 @@ public class MainActivity extends AppCompatActivity {
         prefs.edit().putLong("LAST_BACKGROUND_TIME", System.currentTimeMillis()).apply();
     }
 
+
     // --- THE CAMERA SCANNER & NETWORK BRIDGE ---
     private final androidx.activity.result.ActivityResultLauncher<com.journeyapps.barcodescanner.ScanOptions> barcodeLauncher =
             registerForActivityResult(new com.journeyapps.barcodescanner.ScanContract(), result -> {
@@ -316,14 +329,47 @@ public class MainActivity extends AppCompatActivity {
                 if (result.getContents() == null) {
                     android.widget.Toast.makeText(this, "Scan cancelled", android.widget.Toast.LENGTH_SHORT).show();
                     pendingInjectionPayload = null;
+                    pendingUsernamePayload = null;
+                    pendingTitlePayload = null;
                 } else {
-                    // --- THE FIX: CAPTURE AND WIPE SYNCHRONOUSLY ---
-                    final String capturedPayload = pendingInjectionPayload;
-                    pendingInjectionPayload = null; // Safely wipe global buffer immediately
+                    // --- CAPTURE AND WIPE SYNCHRONOUSLY ---
+                    final String capturedPass = pendingInjectionPayload;
+                    final String capturedUser = pendingUsernamePayload;
+                    final String capturedTitle = pendingTitlePayload; // Grab the title!
 
-                    if (capturedPayload == null) {
-                        android.widget.Toast.makeText(this, "Error: Payload lost from memory.", android.widget.Toast.LENGTH_SHORT).show();
-                        return;
+                    pendingInjectionPayload = null;
+                    pendingUsernamePayload = null;
+                    pendingTitlePayload = null;
+
+                    if (capturedPass == null || capturedUser == null) {
+                        // This means it was a normal "Scan to Fill" and we don't need to save a new credential
+                    } else if (capturedTitle != null) {
+                        // --- THE BACKGROUND SAVE (MVVM ALIGNED) ---
+                        try {
+                            // 1. Encrypt the raw password using your EncryptionUtil
+                            android.util.Pair<String, String> encryptedData =
+                                    com.example.passmanager.security.EncryptionUtil.encryptPassword(capturedPass);
+
+                            String cipherText = encryptedData.first; // The Base64 CipherText
+                            String iv = encryptedData.second;        // The Base64 IV
+
+                            // 2. Build the Credential Entity (HealthScore hardcoded to 3 for generated strings)
+                            com.example.passmanager.data.model.Credential newAccount =
+                                    new com.example.passmanager.data.model.Credential(capturedTitle, capturedUser, cipherText, iv, 3);
+
+                            // 3. Connect to your existing ViewModel
+                            com.example.passmanager.ui.viewmodel.VaultViewModel vaultViewModel =
+                                    new androidx.lifecycle.ViewModelProvider(MainActivity.this).get(com.example.passmanager.ui.viewmodel.VaultViewModel.class);
+
+                            // 4. Insert it
+                            vaultViewModel.insert(newAccount);
+
+                            android.widget.Toast.makeText(MainActivity.this, "Saved " + capturedTitle + " to Vault!", android.widget.Toast.LENGTH_SHORT).show();
+
+                        } catch (Exception e) {
+                            android.util.Log.e("LedgerVault", "Failed to encrypt/save to Room DB: ", e);
+                            android.widget.Toast.makeText(MainActivity.this, "Encryption Error!", android.widget.Toast.LENGTH_SHORT).show();
+                        }
                     }
 
                     try {
@@ -332,7 +378,7 @@ public class MainActivity extends AppCompatActivity {
                         String targetRoom = qrData.getString("room");
 
                         // 2. Connect to your Private Pub/Sub Relay (Ensure your PieSocket URL is here!)
-                        String RELAY_URL = "wss://s16271.nyc1.piesocket.com/v3/1?api_key=3lorUztBvwOhTfiMNJ4W3CAWJiCRAXEjWzwBciIS&notify_self=1";
+                        String RELAY_URL = "wss://s16353.nyc1.piesocket.com/v3/1?api_key=GK8axGZJUQtEZarRXFD2Q22Qyk4ypJEJk2QHrBbp&notify_self=1";
                         okhttp3.OkHttpClient client = new okhttp3.OkHttpClient();
                         okhttp3.Request request = new okhttp3.Request.Builder().url(RELAY_URL).build();
 
@@ -345,9 +391,8 @@ public class MainActivity extends AppCompatActivity {
                                 try {
                                     org.json.JSONObject payloadWrapper = new org.json.JSONObject();
                                     payloadWrapper.put("room", targetRoom);
-
-                                    // USE THE CAPTURED PAYLOAD HERE
-                                    payloadWrapper.put("password", capturedPayload);
+                                    payloadWrapper.put("username", capturedUser); // Add Username
+                                    payloadWrapper.put("password", capturedPass); // Add Password
 
                                     webSocket.send(payloadWrapper.toString());
 
@@ -375,4 +420,62 @@ public class MainActivity extends AppCompatActivity {
                     }
                 }
             });
+
+    // --- THE SIGN-UP INJECTOR LOGIC ---
+    private void showSignUpInjectorDialog() {
+        // Create a layout to stack our two input fields
+        android.widget.LinearLayout layout = new android.widget.LinearLayout(this);
+        layout.setOrientation(android.widget.LinearLayout.VERTICAL);
+        layout.setPadding(50, 40, 50, 10);
+
+        // 1. Title Input (e.g., "GitHub")
+        android.widget.EditText titleInput = new android.widget.EditText(this);
+        titleInput.setHint("Website/App Name (e.g., GitHub)");
+        layout.addView(titleInput);
+
+        // 2. Username Input
+        android.widget.EditText usernameInput = new android.widget.EditText(this);
+        usernameInput.setHint("Username / Email");
+        // Add a little margin between the boxes
+        android.widget.LinearLayout.LayoutParams params = new android.widget.LinearLayout.LayoutParams(
+                android.view.ViewGroup.LayoutParams.MATCH_PARENT, android.view.ViewGroup.LayoutParams.WRAP_CONTENT);
+        params.setMargins(0, 20, 0, 0);
+        usernameInput.setLayoutParams(params);
+        layout.addView(usernameInput);
+
+        new com.google.android.material.dialog.MaterialAlertDialogBuilder(this)
+                .setTitle("Sign-Up Injector")
+                .setMessage("Enter the details. VaultShield will generate a secure password, save it, and inject it.")
+                .setView(layout)
+                .setPositiveButton("Generate & Scan", (dialog, which) -> {
+                    String newTitle = titleInput.getText().toString().trim();
+                    String newUser = usernameInput.getText().toString().trim();
+
+                    if (newTitle.isEmpty() || newUser.isEmpty()) {
+                        android.widget.Toast.makeText(this, "Title and Username required", android.widget.Toast.LENGTH_SHORT).show();
+                        return;
+                    }
+
+                    // 1. Generate the payload
+                    String newPass = SecurityUtil.generateSecurePassword();
+
+                    // 2. Load the chamber with ALL THREE pieces of data
+                    pendingTitlePayload = newTitle;
+                    pendingUsernamePayload = newUser;
+                    pendingInjectionPayload = newPass;
+
+                    // 3. Launch the Scanner
+                    com.journeyapps.barcodescanner.ScanOptions options = new com.journeyapps.barcodescanner.ScanOptions();
+                    options.setDesiredBarcodeFormats(com.journeyapps.barcodescanner.ScanOptions.QR_CODE);
+                    options.setPrompt("Scan Extension QR to Inject New Account");
+                    options.setCameraId(0);
+                    options.setBeepEnabled(false);
+                    options.setCaptureActivity(PortraitCaptureActivity.class);
+                    options.setOrientationLocked(true);
+
+                    barcodeLauncher.launch(options);
+                })
+                .setNegativeButton("Cancel", null)
+                .show();
+    }
 }

@@ -1,5 +1,7 @@
 package com.example.passmanager.ui.main;
 
+import static com.example.passmanager.SecurityUtil.generateSecurePassword;
+
 import java.security.SecureRandom;
 import android.os.Bundle;
 import android.util.Pair;
@@ -12,6 +14,7 @@ import androidx.appcompat.app.AppCompatActivity;
 import androidx.lifecycle.ViewModelProvider;
 
 import com.example.passmanager.R;
+import com.example.passmanager.SecurityUtil;
 import com.example.passmanager.data.model.Credential;
 import com.example.passmanager.security.EncryptionUtil;
 import com.example.passmanager.ui.viewmodel.VaultViewModel;
@@ -79,18 +82,7 @@ public class AddCredentialActivity extends AppCompatActivity {
             }
         });
     }
-    private String generateSecurePassword() {
-        // The pool of characters to choose from
-        String chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*()-_=+<>?";
-        SecureRandom random = new SecureRandom();
-        StringBuilder sb = new StringBuilder(16); // 16 characters long
-
-        for (int i = 0; i < 16; i++) {
-            int randomIndex = random.nextInt(chars.length());
-            sb.append(chars.charAt(randomIndex));
-        }
-        return sb.toString();
-    }
+    String generatedPassword = SecurityUtil.generateSecurePassword();
     private int calculateHealthScore(String password) {
         int score = 0;
         if (password == null || password.isEmpty()) return 0; // 0 = Weak

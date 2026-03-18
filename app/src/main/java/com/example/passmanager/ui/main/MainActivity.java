@@ -107,9 +107,6 @@ public class MainActivity extends AppCompatActivity {
                 filterVault(s.toString());
             }
         });
-        // --- TEMPORARY SIGN-UP BUTTON ---
-        com.google.android.material.floatingactionbutton.FloatingActionButton fabGenerate = findViewById(R.id.fabGenerate);
-        fabGenerate.setOnClickListener(v -> showSignUpInjectorDialog());
 
         // --- 5. NAV BAR LOGIC ---
         bottomNav.setOnItemSelectedListener(item -> {
@@ -245,9 +242,9 @@ public class MainActivity extends AppCompatActivity {
                 }
             }
         }).attachToRecyclerView(recyclerView);
-
+        // This is the ONLY click listener you should have for fabAdd
         fabAdd.setOnClickListener(v -> {
-            startActivity(new android.content.Intent(MainActivity.this, AddCredentialActivity.class));
+            showAddBottomSheet();
         });
     }
 
@@ -477,5 +474,33 @@ public class MainActivity extends AppCompatActivity {
                 })
                 .setNegativeButton("Cancel", null)
                 .show();
+    }
+
+    private void showAddBottomSheet() {
+        com.google.android.material.bottomsheet.BottomSheetDialog bottomSheetDialog =
+                new com.google.android.material.bottomsheet.BottomSheetDialog(this);
+
+        android.view.View sheetView = getLayoutInflater().inflate(R.layout.bottom_sheet_add, null);
+        bottomSheetDialog.setContentView(sheetView);
+
+        // 1. Bind the two new rows
+        android.widget.LinearLayout btnManual = sheetView.findViewById(R.id.btn_manual_entry);
+        android.widget.LinearLayout btnGenerate = sheetView.findViewById(R.id.btn_generate_inject);
+
+        // 2. Wire up the Manual Entry click
+        btnManual.setOnClickListener(v -> {
+            bottomSheetDialog.dismiss();
+            // Start your standard Add Activity
+            startActivity(new android.content.Intent(MainActivity.this, com.example.passmanager.ui.main.AddCredentialActivity.class));
+        });
+
+        // 3. Wire up the Generator click
+        btnGenerate.setOnClickListener(v -> {
+            bottomSheetDialog.dismiss();
+            // Trigger the generator dialog we built earlier!
+            showSignUpInjectorDialog();
+        });
+
+        bottomSheetDialog.show();
     }
 }

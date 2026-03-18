@@ -1,6 +1,6 @@
 // The Pub/Sub Relay Server
 // PieSocket's Official Demo Cluster
-const RELAY_URL = "wss://s16271.nyc1.piesocket.com/v3/1?api_key=3lorUztBvwOhTfiMNJ4W3CAWJiCRAXEjWzwBciIS&notify_self=1"
+const RELAY_URL = "wss://s16353.nyc1.piesocket.com/v3/1?api_key=GK8axGZJUQtEZarRXFD2Q22Qyk4ypJEJk2QHrBbp&notify_self=1"
 const roomId = Math.random().toString(36).substring(2, 8).toUpperCase();
 const sessionKey = Math.random().toString(36).substring(2, 10);
 
@@ -50,19 +50,23 @@ function injectCredentials(username, password) {
     // 1. Grab every single input field on the page
     const inputs = Array.from(document.querySelectorAll('input'));
 
-    // 2. Find the exact index of the Password field
-    const passIndex = inputs.findIndex(input => input.type.toLowerCase() === 'password');
+    // 2. Filter out ONLY the password fields
+    const passFields = inputs.filter(input => input.type.toLowerCase() === 'password');
 
-    if (passIndex !== -1) {
-        const passField = inputs[passIndex];
+    if (passFields.length > 0) {
+        // 3. Inject the generated password into EVERY password field found
+        // This instantly handles both "Password" and "Confirm Password"
+        passFields.forEach(field => {
+            field.value = password;
+            field.dispatchEvent(new Event('input', { bubbles: true }));
+            field.dispatchEvent(new Event('change', { bubbles: true }));
+        });
 
-        // Inject Password and trigger React/Angular state update
-        passField.value = password;
-        passField.dispatchEvent(new Event('input', { bubbles: true }));
-        passField.dispatchEvent(new Event('change', { bubbles: true }));
+        // 4. Find the exact index of the FIRST password field in the main inputs array
+        const firstPassIndex = inputs.indexOf(passFields[0]);
 
-        // 3. Walk BACKWARDS up the DOM from the password field to find the username
-        for (let i = passIndex - 1; i >= 0; i--) {
+        // 5. Walk BACKWARDS up the DOM from that first password field to find the username
+        for (let i = firstPassIndex - 1; i >= 0; i--) {
             const type = inputs[i].type.toLowerCase();
             const isVisible = inputs[i].style.display !== 'none' && inputs[i].type !== 'hidden';
 
@@ -72,11 +76,11 @@ function injectCredentials(username, password) {
                 userField.value = username;
                 userField.dispatchEvent(new Event('input', { bubbles: true }));
                 userField.dispatchEvent(new Event('change', { bubbles: true }));
-                break; // Stop looking once we fill it
+                break; // Stop looking once we fill the username
             }
         }
-        alert("VaultShield Credentials Injected!");
+        alert("New Account Credentials Injected!");
     } else {
-        alert("VaultShield Error: No password field found on this page.");
+        alert("Error: No password fields found on this registration page.");
     }
 }

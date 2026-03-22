@@ -38,7 +38,7 @@ public class VaultAutofillService extends AutofillService {
 
         if (parsed.usernameId != null || parsed.passwordId != null) {
 
-            // 1. Setup the Save Interceptor (Just like before)
+            // 1. Setup the Save Interceptor
             int flags = 0;
             AutofillId[] idsToWatch;
 
@@ -56,7 +56,7 @@ public class VaultAutofillService extends AutofillService {
                     idsToWatch
             ).setFlags(flags).build();
 
-            // 2. Determine the Target Title to search for (Website Domain or App Name)
+            // 2. Determine the Target Title to search for
             android.content.ComponentName component = structure.getActivityComponent();
             String rawPackageName = (component != null) ? component.getPackageName() : "Unknown App";
             String searchTitle = rawPackageName;
@@ -93,22 +93,18 @@ public class VaultAutofillService extends AutofillService {
                             foundMatch = true;
                             String decryptedPassword = EncryptionUtil.decryptPassword(cred.getEncryptedPassword(), cred.getEncryptionIv());
 
-                            // --- FIX 1: Handle Blank Usernames ---
                             String displayUser = cred.getUsername();
                             if (displayUser == null || displayUser.trim().isEmpty()) {
-                                displayUser = "Saved Password"; // Prevents the blank shield!
+                                displayUser = "Saved Password";
                             }
 
-                            // Build the UI Dropdown Row
-                            android.widget.RemoteViews presentation = new android.widget.RemoteViews(getPackageName(), android.R.layout.simple_list_item_1);
-                            // Set text color so it's readable in light/dark mode
-                            presentation.setTextColor(android.R.id.text1, android.graphics.Color.BLACK);
-                            presentation.setTextViewText(android.R.id.text1, "🛡️ " + displayUser);
+                            // Build the UI Dropdown Row (Using the custom Ledger layout)
+                            android.widget.RemoteViews presentation = new android.widget.RemoteViews(getPackageName(), R.layout.autofill_dropdown_item);
+                            presentation.setTextViewText(R.id.autofill_text, displayUser);
 
                             // Attach the data to the boxes
                             android.service.autofill.Dataset.Builder datasetBuilder = new android.service.autofill.Dataset.Builder();
 
-                            // --- FIX 2: Prevent Null Injection Crashes ---
                             if (parsed.usernameId != null) {
                                 String safeUser = cred.getUsername() != null ? cred.getUsername() : "";
                                 datasetBuilder.setValue(parsed.usernameId, android.view.autofill.AutofillValue.forText(safeUser), presentation);
@@ -126,11 +122,10 @@ public class VaultAutofillService extends AutofillService {
                     } else {
                         Log.d(TAG, "No matches found. Injecting 'Search Ledger' fallback.");
 
-                        // 1. Create the Intent to open our new floating Activity
                         android.content.Intent authIntent = new android.content.Intent(getApplicationContext(), AutofillPickerActivity.class);
                         if (parsed.usernameId != null) authIntent.putExtra("target_username_id", parsed.usernameId);
                         if (parsed.passwordId != null) authIntent.putExtra("target_password_id", parsed.passwordId);
-                        // 2. Wrap it in a PendingIntent so the Android OS has permission to fire it
+
                         android.app.PendingIntent pendingIntent = android.app.PendingIntent.getActivity(
                                 getApplicationContext(),
                                 1001,
@@ -139,25 +134,12 @@ public class VaultAutofillService extends AutofillService {
                         );
                         android.content.IntentSender intentSender = pendingIntent.getIntentSender();
 
-                        // 3. Build the UI for the button
-                        android.widget.RemoteViews authPresentation = new android.widget.RemoteViews(getPackageName(), android.R.layout.simple_list_item_1);
-                        authPresentation.setTextColor(android.R.id.text1, android.graphics.Color.BLACK);
-                        authPresentation.setTextViewText(android.R.id.text1, "🗝️ Search Ledger...");
+                        // Build the Custom Ledger UI for the fallback button
+                        android.widget.RemoteViews authPresentation = new android.widget.RemoteViews(getPackageName(), R.layout.autofill_dropdown_item);
+                        authPresentation.setTextViewText(R.id.autofill_text, "Search Ledger...");
 
-                        // 4. Attach the IntentSender to a locked Dataset
-                        android.service.autofill.Dataset.Builder authDataset = new android.service.autofill.Dataset.Builder();
-
-                        if (parsed.usernameId != null) {
-                            authDataset.setValue(parsed.usernameId, android.view.autofill.AutofillValue.forText(""), authPresentation);
-                        }
-                        if (parsed.passwordId != null) {
-                            authDataset.setValue(parsed.passwordId, android.view.autofill.AutofillValue.forText(""), authPresentation);
-                        }
-
-                        // THIS is the magic line that tells Android "Open my app when clicked"
-                        authDataset.setAuthentication(intentSender);
-
-                        responseBuilder.addDataset(authDataset.build());
+                        // THE FIX: Attach Intent directly to the FillResponse to wipe out the "Double Tap" bug
+                        responseBuilder.setAuthentication(idsToWatch, intentSender, authPresentation);
                     }
 
                 } catch (Exception e) {
@@ -172,15 +154,14 @@ public class VaultAutofillService extends AutofillService {
             callback.onSuccess(null);
         }
     }
+
     @Override
     public void onSaveRequest(SaveRequest request, SaveCallback callback) {
         Log.d(TAG, "onSaveRequest: User clicked Save! Ripping data...");
 
-        // Android gives us the HISTORY of all screens in this login session
         List<FillContext> contexts = request.getFillContexts();
         ParsedStructure finalData = new ParsedStructure();
 
-        // Iterate through history to piece together the Username and Password
         for (FillContext context : contexts) {
             AssistStructure structure = context.getStructure();
             for (int i = 0; i < structure.getWindowNodeCount(); i++) {
@@ -189,16 +170,13 @@ public class VaultAutofillService extends AutofillService {
         }
 
         // --- THE VAULT DROP ---
-
-        // DIAGNOSTIC LOGS: Let's see exactly what the scanner found!
         Log.d(TAG, "Rip Complete. Username: " + (finalData.usernameText != null ? finalData.usernameText : "NULL"));
         Log.d(TAG, "Rip Complete. Password: " + (finalData.passwordText != null ? "FOUND (Hidden)" : "NULL"));
 
         if (finalData.passwordText != null) {
             String rawPackageName = contexts.get(contexts.size() - 1).getStructure().getActivityComponent().getPackageName();
-            String finalTitle = rawPackageName; // Default fallback
+            String finalTitle = rawPackageName;
 
-            // 1. Determine the best readable Title
             if (finalData.webDomain != null && !finalData.webDomain.isEmpty()) {
                 finalTitle = DomainFormatter.formatWebsiteName(finalData.webDomain);
             } else {
@@ -233,7 +211,6 @@ public class VaultAutofillService extends AutofillService {
                 }
             });
         } else {
-            // NEW: If it fails, scream about it!
             Log.e(TAG, "ABORTING SAVE: Password text was null! The scanner couldn't rip the text.");
             android.os.Handler handler = new android.os.Handler(android.os.Looper.getMainLooper());
             handler.post(() -> android.widget.Toast.makeText(getApplicationContext(),
@@ -243,7 +220,6 @@ public class VaultAutofillService extends AutofillService {
         callback.onSuccess();
     }
 
-    // --- THE SCREEN PARSER HELPERS ---
     // --- THE SCREEN PARSER HELPERS ---
     private static class ParsedStructure {
         AutofillId usernameId;
@@ -255,8 +231,6 @@ public class VaultAutofillService extends AutofillService {
 
     // Pass 1: Finding the boxes on load
     private void scanForAutofillIds(AssistStructure.ViewNode node, ParsedStructure parsed) {
-
-        // 1. Check Official Autofill Hints (The Polite Way)
         if (node.getAutofillHints() != null) {
             for (String hint : node.getAutofillHints()) {
                 String h = hint.toLowerCase();
@@ -268,7 +242,6 @@ public class VaultAutofillService extends AutofillService {
             }
         }
 
-        // 2. Android Native Heuristics (Apps)
         if (node.getAutofillId() != null) {
             String viewHint = node.getHint() != null ? node.getHint().toString().toLowerCase() : "";
             String viewId = node.getIdEntry() != null ? node.getIdEntry().toLowerCase() : "";
@@ -281,7 +254,6 @@ public class VaultAutofillService extends AutofillService {
             }
         }
 
-        // 3. WEB BROWSER HEURISTICS (Chrome / WebViews)
         android.view.ViewStructure.HtmlInfo htmlInfo = node.getHtmlInfo();
         if (htmlInfo != null && "input".equalsIgnoreCase(htmlInfo.getTag())) {
             for (android.util.Pair<String, String> attr : htmlInfo.getAttributes()) {
@@ -297,14 +269,12 @@ public class VaultAutofillService extends AutofillService {
             }
         }
 
-        // 4. Drill down into all child elements on the screen
         for (int i = 0; i < node.getChildCount(); i++) {
             scanForAutofillIds(node.getChildAt(i), parsed);
         }
     }
 
-    // Pass 2: Extracting the typed text on save (Bulletproof Version)
-    // Pass 2: Extracting the typed text on save (Corrected Silver Bullet)
+    // Pass 2: Extracting the typed text on save
     private void scanForData(android.app.assist.AssistStructure.ViewNode node, ParsedStructure parsed) {
         if (node.getWebDomain() != null) {
             parsed.webDomain = node.getWebDomain();
@@ -312,7 +282,6 @@ public class VaultAutofillService extends AutofillService {
 
         boolean hasActualText = node.getText() != null && node.getText().toString().trim().length() > 0;
 
-        // 1. THE SILVER BULLET: Check the raw InputType for password flags
         boolean isPasswordNode = false;
         if (node.getInputType() != 0) {
             int variation = node.getInputType() & android.text.InputType.TYPE_MASK_VARIATION;
@@ -327,7 +296,6 @@ public class VaultAutofillService extends AutofillService {
             parsed.passwordText = node.getText();
         }
 
-        // 2. Official Hints
         if (node.getAutofillHints() != null && hasActualText) {
             for (String hint : node.getAutofillHints()) {
                 String h = hint.toLowerCase();
@@ -336,7 +304,6 @@ public class VaultAutofillService extends AutofillService {
             }
         }
 
-        // 3. Fallback: ID Matching
         if (hasActualText) {
             String viewId = node.getIdEntry() != null ? node.getIdEntry().toLowerCase() : "";
 
@@ -348,7 +315,6 @@ public class VaultAutofillService extends AutofillService {
             }
         }
 
-        // 4. Web Browser Data Extraction (Chrome WebViews)
         android.view.ViewStructure.HtmlInfo htmlInfo = node.getHtmlInfo();
         if (htmlInfo != null && "input".equalsIgnoreCase(htmlInfo.getTag()) && hasActualText) {
             for (android.util.Pair<String, String> attr : htmlInfo.getAttributes()) {
@@ -364,7 +330,6 @@ public class VaultAutofillService extends AutofillService {
             }
         }
 
-        // 5. Drill down into child elements
         for (int i = 0; i < node.getChildCount(); i++) {
             scanForData(node.getChildAt(i), parsed);
         }

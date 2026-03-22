@@ -49,7 +49,7 @@
         <activity
             android:name=".AutofillPickerActivity"
             android:exported="false"
-            android:theme="@style/Theme.AppCompat.Light.Dialog" />
+            android:theme="@style/Theme.LedgerAutofillPicker" />
 
         <service
             android:name=".VaultAutofillService"

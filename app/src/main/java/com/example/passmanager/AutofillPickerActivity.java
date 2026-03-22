@@ -4,10 +4,9 @@ import android.os.Bundle;
 import android.widget.ArrayAdapter;
 import android.widget.ListView;
 import androidx.appcompat.app.AppCompatActivity;
-import com.example.passmanager.data.model.Credential;
 import com.example.passmanager.repository.CredentialRepository;
+import com.example.passmanager.data.model.Credential;
 import com.example.passmanager.security.EncryptionUtil;
-import java.util.ArrayList;
 import java.util.List;
 
 public class AutofillPickerActivity extends AppCompatActivity {
@@ -17,7 +16,7 @@ public class AutofillPickerActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_autofill_picker);
 
-        // 1. Catch the target coordinates from the Service
+        // 1. Catch the target coordinates
         android.view.autofill.AutofillId usernameId = getIntent().getParcelableExtra("target_username_id");
         android.view.autofill.AutofillId passwordId = getIntent().getParcelableExtra("target_password_id");
 
@@ -29,18 +28,28 @@ public class AutofillPickerActivity extends AppCompatActivity {
                 CredentialRepository repo = new CredentialRepository(getApplication());
                 List<Credential> allCreds = repo.getAllCredentialsSync();
 
-                // Format strings for the ListView (e.g., "Google - harsh@email.com")
-                List<String> displayList = new ArrayList<>();
-                for (Credential c : allCreds) {
-                    displayList.add(c.getTitle() + " - " + (c.getUsername() != null ? c.getUsername() : "Saved Password"));
-                }
-
-                // 3. Push data to the UI thread
+                // 3. Push data to the UI thread with a CUSTOM PREMIUM ADAPTER
                 runOnUiThread(() -> {
-                    ArrayAdapter<String> adapter = new ArrayAdapter<>(this, android.R.layout.simple_list_item_1, displayList);
+                    ArrayAdapter<Credential> adapter = new ArrayAdapter<Credential>(this, R.layout.item_picker_credential, allCreds) {
+                        @Override
+                        public android.view.View getView(int position, android.view.View convertView, android.view.ViewGroup parent) {
+                            if (convertView == null) {
+                                convertView = getLayoutInflater().inflate(R.layout.item_picker_credential, parent, false);
+                            }
+                            Credential cred = getItem(position);
+                            android.widget.TextView title = convertView.findViewById(R.id.text_title);
+                            android.widget.TextView username = convertView.findViewById(R.id.text_username);
+
+                            title.setText(cred.getTitle());
+                            String displayUser = cred.getUsername();
+                            // Aesthetic: Cleanly show if username is empty
+                            username.setText((displayUser != null && !displayUser.trim().isEmpty()) ? displayUser : "Saved Password");
+                            return convertView;
+                        }
+                    };
                     listView.setAdapter(adapter);
 
-                    // 4. THE INJECTION TRIGGER: When the user taps an account
+                    // 4. THE INJECTION TRIGGER: Fixes the double-tap bug
                     listView.setOnItemClickListener((parent, view, position, id) -> {
                         Credential selectedCred = allCreds.get(position);
 
@@ -48,25 +57,26 @@ public class AutofillPickerActivity extends AppCompatActivity {
                             // Decrypt the payload
                             String decryptedPassword = EncryptionUtil.decryptPassword(selectedCred.getEncryptedPassword(), selectedCred.getEncryptionIv());
 
-                            // Build the final dataset
-                            android.widget.RemoteViews presentation = new android.widget.RemoteViews(getPackageName(), android.R.layout.simple_list_item_1);
-                            presentation.setTextViewText(android.R.id.text1, "🛡️ " + selectedCred.getUsername());
+                            // A. Create Presentation for the main app UI
+                            android.widget.RemoteViews presentation = new android.widget.RemoteViews(getPackageName(), R.layout.autofill_dropdown_item);
+                            presentation.setTextViewText(R.id.autofill_text, selectedCred.getUsername());
 
+                            // B. Build the Dataset (The actual data package)
                             android.service.autofill.Dataset.Builder datasetBuilder = new android.service.autofill.Dataset.Builder();
 
-                            if (usernameId != null) {
-                                datasetBuilder.setValue(usernameId, android.view.autofill.AutofillValue.forText(selectedCred.getUsername()), presentation);
-                            }
-                            if (passwordId != null) {
-                                datasetBuilder.setValue(passwordId, android.view.autofill.AutofillValue.forText(decryptedPassword), presentation);
-                            }
+                            if (usernameId != null) datasetBuilder.setValue(usernameId, android.view.autofill.AutofillValue.forText(selectedCred.getUsername()), presentation);
+                            if (passwordId != null) datasetBuilder.setValue(passwordId, android.view.autofill.AutofillValue.forText(decryptedPassword), presentation);
 
-                            // Package the dataset and send it back to Android OS
+                            // C. FIX: Wrap the Dataset inside a FillResponse so it overwrites both fields simultaneously.
+                            android.service.autofill.FillResponse masterResponse = new android.service.autofill.FillResponse.Builder()
+                                    .addDataset(datasetBuilder.build())
+                                    .build();
+
+                            // D. Package the FillResponse and send it back to Android OS
                             android.content.Intent replyIntent = new android.content.Intent();
-                            replyIntent.putExtra(android.view.autofill.AutofillManager.EXTRA_AUTHENTICATION_RESULT, datasetBuilder.build());
+                            replyIntent.putExtra(android.view.autofill.AutofillManager.EXTRA_AUTHENTICATION_RESULT, masterResponse);
                             setResult(RESULT_OK, replyIntent);
 
-                            // Close the floating window!
                             finish();
 
                         } catch (Exception e) {

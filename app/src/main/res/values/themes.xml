@@ -6,4 +6,13 @@
         <item name="colorSurface">@color/vault_surface</item>
         <item name="colorOnSurface">@color/vault_text_primary</item>
     </style>
+
+    <style name="Base.Theme.PassManager" parent="Theme.Material3.DayNight.NoActionBar">
+    </style>
+
+    <style name="Theme.LedgerAutofillPicker" parent="Theme.Material3.DayNight.Dialog.Alert">
+        <item name="android:windowNoTitle">true</item>
+        <item name="android:windowBackground">@android:color/transparent</item>
+        <item name="colorPrimary">#00FF00</item>
+    </style>
 </resources>

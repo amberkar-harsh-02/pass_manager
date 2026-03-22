@@ -36,4 +36,8 @@ public class CredentialRepository {
     public void update(Credential credential) {
         executorService.execute(() -> credentialDao.updateCredential(credential));
     }
+
+    public java.util.List<com.example.passmanager.data.model.Credential> getAllCredentialsSync() {
+        return credentialDao.getAllCredentialsSync();
+    }
 }

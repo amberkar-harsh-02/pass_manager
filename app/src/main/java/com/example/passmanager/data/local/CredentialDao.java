@@ -25,4 +25,7 @@ public interface CredentialDao {
 
     @Query("SELECT * FROM credentials_table ORDER BY title ASC")
     LiveData<List<Credential>> getAllCredentials();
+
+    @Query("SELECT * FROM credentials_table")
+    java.util.List<com.example.passmanager.data.model.Credential> getAllCredentialsSync();
 }

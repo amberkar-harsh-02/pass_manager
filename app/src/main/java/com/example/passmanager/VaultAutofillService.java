@@ -86,24 +86,32 @@ public class VaultAutofillService extends AutofillService {
                     boolean foundMatch = false;
 
                     for (Credential cred : allCreds) {
-                        // Look for a match (e.g., checking if "madhat.io" matches the DB title)
+                        // Look for a match
                         if (cred.getTitle().toLowerCase().contains(finalSearchTitle.toLowerCase()) ||
                                 finalSearchTitle.toLowerCase().contains(cred.getTitle().toLowerCase())) {
 
                             foundMatch = true;
-
-                            // Decrypt the payload
                             String decryptedPassword = EncryptionUtil.decryptPassword(cred.getEncryptedPassword(), cred.getEncryptionIv());
+
+                            // --- FIX 1: Handle Blank Usernames ---
+                            String displayUser = cred.getUsername();
+                            if (displayUser == null || displayUser.trim().isEmpty()) {
+                                displayUser = "Saved Password"; // Prevents the blank shield!
+                            }
 
                             // Build the UI Dropdown Row
                             android.widget.RemoteViews presentation = new android.widget.RemoteViews(getPackageName(), android.R.layout.simple_list_item_1);
-                            presentation.setTextViewText(android.R.id.text1, "🛡️ " + cred.getUsername());
+                            // Set text color so it's readable in light/dark mode
+                            presentation.setTextColor(android.R.id.text1, android.graphics.Color.BLACK);
+                            presentation.setTextViewText(android.R.id.text1, "🛡️ " + displayUser);
 
-                            // Attach the decrypted data to the boxes
+                            // Attach the data to the boxes
                             android.service.autofill.Dataset.Builder datasetBuilder = new android.service.autofill.Dataset.Builder();
 
+                            // --- FIX 2: Prevent Null Injection Crashes ---
                             if (parsed.usernameId != null) {
-                                datasetBuilder.setValue(parsed.usernameId, android.view.autofill.AutofillValue.forText(cred.getUsername()), presentation);
+                                String safeUser = cred.getUsername() != null ? cred.getUsername() : "";
+                                datasetBuilder.setValue(parsed.usernameId, android.view.autofill.AutofillValue.forText(safeUser), presentation);
                             }
                             if (parsed.passwordId != null) {
                                 datasetBuilder.setValue(parsed.passwordId, android.view.autofill.AutofillValue.forText(decryptedPassword), presentation);
@@ -116,7 +124,40 @@ public class VaultAutofillService extends AutofillService {
                     if (foundMatch) {
                         Log.d(TAG, "Found matches! Injecting datasets.");
                     } else {
-                        Log.d(TAG, "No matches found in Vault for: " + finalSearchTitle);
+                        Log.d(TAG, "No matches found. Injecting 'Search Ledger' fallback.");
+
+                        // 1. Create the Intent to open our new floating Activity
+                        android.content.Intent authIntent = new android.content.Intent(getApplicationContext(), AutofillPickerActivity.class);
+                        if (parsed.usernameId != null) authIntent.putExtra("target_username_id", parsed.usernameId);
+                        if (parsed.passwordId != null) authIntent.putExtra("target_password_id", parsed.passwordId);
+                        // 2. Wrap it in a PendingIntent so the Android OS has permission to fire it
+                        android.app.PendingIntent pendingIntent = android.app.PendingIntent.getActivity(
+                                getApplicationContext(),
+                                1001,
+                                authIntent,
+                                android.app.PendingIntent.FLAG_CANCEL_CURRENT | android.app.PendingIntent.FLAG_MUTABLE
+                        );
+                        android.content.IntentSender intentSender = pendingIntent.getIntentSender();
+
+                        // 3. Build the UI for the button
+                        android.widget.RemoteViews authPresentation = new android.widget.RemoteViews(getPackageName(), android.R.layout.simple_list_item_1);
+                        authPresentation.setTextColor(android.R.id.text1, android.graphics.Color.BLACK);
+                        authPresentation.setTextViewText(android.R.id.text1, "🗝️ Search Ledger...");
+
+                        // 4. Attach the IntentSender to a locked Dataset
+                        android.service.autofill.Dataset.Builder authDataset = new android.service.autofill.Dataset.Builder();
+
+                        if (parsed.usernameId != null) {
+                            authDataset.setValue(parsed.usernameId, android.view.autofill.AutofillValue.forText(""), authPresentation);
+                        }
+                        if (parsed.passwordId != null) {
+                            authDataset.setValue(parsed.passwordId, android.view.autofill.AutofillValue.forText(""), authPresentation);
+                        }
+
+                        // THIS is the magic line that tells Android "Open my app when clicked"
+                        authDataset.setAuthentication(intentSender);
+
+                        responseBuilder.addDataset(authDataset.build());
                     }
 
                 } catch (Exception e) {

@@ -1,17 +1,22 @@
 package com.example.passmanager.ui.main;
 
 import android.content.Context;
+import android.content.Intent;
 import android.content.SharedPreferences;
+import android.net.Uri;
 import android.os.Bundle;
+import android.provider.Settings;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.WindowManager;
+import android.view.autofill.AutofillManager;
 import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+import androidx.appcompat.widget.SwitchCompat;
 import androidx.fragment.app.Fragment;
 import androidx.lifecycle.ViewModelProvider;
 
@@ -32,9 +37,10 @@ public class SecurityFragment extends Fragment {
     private SharedPreferences sharedPreferences;
     private TextView textAutoLockStatus;
     private List<com.example.passmanager.data.model.AuditLog> currentLogs = new java.util.ArrayList<>();
-
-    // NEW: Store the vault data in memory for the audit
     private List<Credential> currentVault = new ArrayList<>();
+
+    private AutofillManager autofillManager;
+    private SwitchMaterial autofillSwitch;
 
     private final String[] timeoutOptions = {"Immediately", "1 Minute", "5 Minutes", "Never"};
     private final long[] timeoutValues = {0, 60000, 300000, -1};
@@ -77,6 +83,7 @@ public class SecurityFragment extends Fragment {
                 Toast.makeText(getContext(), "Stealth Mode Disabled", Toast.LENGTH_SHORT).show();
             }
         });
+
         // --- 2. AUTO-LOCK TIMEOUT ---
         long currentTimeout = sharedPreferences.getLong("AUTO_LOCK_TIMEOUT", 0);
         updateAutoLockText(currentTimeout);
@@ -90,9 +97,55 @@ public class SecurityFragment extends Fragment {
 
         View btnAuditLog = view.findViewById(R.id.btn_audit_log);
         btnAuditLog.setOnClickListener(v -> showAuditLogDialog());
+
         View btnSetupDuress = view.findViewById(R.id.btn_setup_duress);
         btnSetupDuress.setOnClickListener(v -> showDuressPinDialog());
+
+        // --- 4. AUTOFILL TOGGLE LOGIC ---
+        autofillSwitch = view.findViewById(R.id.switch_autofill);
+
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+            autofillManager = requireContext().getSystemService(AutofillManager.class);
+        }
+
+        autofillSwitch.setOnClickListener(v -> {
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+                boolean isCurrentlyEnabled = autofillManager != null && autofillManager.hasEnabledAutofillServices();
+
+                if (!isCurrentlyEnabled) {
+                    // Turn it ON: Send them to Settings
+                    autofillSwitch.setChecked(false); // Keep it off visually until confirmed
+                    Intent intent = new Intent(Settings.ACTION_REQUEST_SET_AUTOFILL_SERVICE);
+                    intent.setData(Uri.parse("package:" + requireContext().getPackageName()));
+                    startActivity(intent);
+                } else {
+                    // Turn it OFF: Force kill the service at the OS level!
+                    if (autofillManager != null) {
+                        autofillManager.disableAutofillServices();
+                        autofillSwitch.setChecked(false);
+                        Toast.makeText(getContext(), "Autofill disabled at system level.", Toast.LENGTH_SHORT).show();
+                    }
+                }
+            }
+        });
+
         return view;
+    }
+
+    // Every time the user looks at this tab, sync the switch with the actual system truth
+    @Override
+    public void onResume() {
+        super.onResume();
+        syncAutofillSwitchState();
+    }
+
+    private void syncAutofillSwitchState() {
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O && autofillManager != null) {
+            boolean isLedgerActive = autofillManager.hasEnabledAutofillServices();
+            if (autofillSwitch != null) {
+                autofillSwitch.setChecked(isLedgerActive);
+            }
+        }
     }
 
     private void showTimeoutDialog() {
@@ -124,18 +177,15 @@ public class SecurityFragment extends Fragment {
         else if (timeoutInMillis == -1) textAutoLockStatus.setText("Never");
     }
 
-    // --- NEW: THE THREAT INTELLIGENCE ENGINE ---
     private void runReuseAudit() {
         if (currentVault.size() < 2) {
             Toast.makeText(getContext(), "Not enough credentials to run an audit.", Toast.LENGTH_SHORT).show();
             return;
         }
 
-        // Map format: <DecryptedPassword, List of Account Titles>
         HashMap<String, List<String>> passwordMap = new HashMap<>();
 
         try {
-            // 1. Decrypt and Group
             for (Credential cred : currentVault) {
                 String decrypted = EncryptionUtil.decryptPassword(cred.getEncryptedPassword(), cred.getEncryptionIv());
 
@@ -145,19 +195,16 @@ public class SecurityFragment extends Fragment {
                 passwordMap.get(decrypted).add(cred.getTitle());
             }
 
-            // 2. Analyze the grouped data
             StringBuilder report = new StringBuilder();
             int reuseCount = 0;
 
             for (Map.Entry<String, List<String>> entry : passwordMap.entrySet()) {
                 if (entry.getValue().size() > 1) {
                     reuseCount++;
-                    // Append the titles of the accounts sharing this password
                     report.append("• Reused across: ").append(String.join(", ", entry.getValue())).append("\n\n");
                 }
             }
 
-            // 3. Display the Intelligence Report
             if (reuseCount == 0) {
                 new MaterialAlertDialogBuilder(requireContext())
                         .setTitle("Audit Complete")
@@ -177,6 +224,7 @@ public class SecurityFragment extends Fragment {
             Toast.makeText(getContext(), "Audit Failed: Decryption Error", Toast.LENGTH_SHORT).show();
         }
     }
+
     private void showAuditLogDialog() {
         if (currentLogs.isEmpty()) {
             Toast.makeText(getContext(), "No logs available.", Toast.LENGTH_SHORT).show();
@@ -184,10 +232,8 @@ public class SecurityFragment extends Fragment {
         }
 
         StringBuilder report = new StringBuilder();
-        // Format the raw milliseconds into a clean Date/Time
         java.text.SimpleDateFormat sdf = new java.text.SimpleDateFormat("MMM dd, yyyy - HH:mm:ss", java.util.Locale.getDefault());
 
-        // Loop through the most recent 20 logs to prevent the dialog from getting too massive
         int limit = Math.min(currentLogs.size(), 20);
         for (int i = 0; i < limit; i++) {
             com.example.passmanager.data.model.AuditLog log = currentLogs.get(i);
@@ -205,14 +251,13 @@ public class SecurityFragment extends Fragment {
                 .setPositiveButton("Close", null)
                 .show();
     }
+
     private void showDuressPinDialog() {
-        // Create a programmatic EditText for the dialog
         final android.widget.EditText input = new android.widget.EditText(requireContext());
         input.setInputType(android.text.InputType.TYPE_CLASS_NUMBER | android.text.InputType.TYPE_NUMBER_VARIATION_PASSWORD);
         input.setHint("Enter 4-digit PIN");
         input.setFilters(new android.text.InputFilter[] { new android.text.InputFilter.LengthFilter(4) });
 
-        // Add some padding so it looks clean inside the dialog
         android.widget.FrameLayout container = new android.widget.FrameLayout(requireContext());
         android.widget.FrameLayout.LayoutParams params = new android.widget.FrameLayout.LayoutParams(
                 android.view.ViewGroup.LayoutParams.MATCH_PARENT, android.view.ViewGroup.LayoutParams.WRAP_CONTENT);
@@ -227,7 +272,6 @@ public class SecurityFragment extends Fragment {
                 .setPositiveButton("Save", (dialog, which) -> {
                     String pin = input.getText().toString();
                     if(pin.length() == 4) {
-                        // Hash it so it's safely stored!
                         String hashed = hashPin(pin);
                         sharedPreferences.edit().putString("DURESS_PIN_HASH", hashed).apply();
                         android.widget.Toast.makeText(getContext(), "Duress PIN Secured", android.widget.Toast.LENGTH_SHORT).show();

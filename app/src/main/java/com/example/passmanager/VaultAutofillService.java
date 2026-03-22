@@ -159,7 +159,7 @@ public class VaultAutofillService extends AutofillService {
 
             // 1. Determine the best readable Title
             if (finalData.webDomain != null && !finalData.webDomain.isEmpty()) {
-                finalTitle = finalData.webDomain;
+                finalTitle = DomainFormatter.formatWebsiteName(finalData.webDomain);
             } else {
                 try {
                     android.content.pm.PackageManager pm = getApplicationContext().getPackageManager();

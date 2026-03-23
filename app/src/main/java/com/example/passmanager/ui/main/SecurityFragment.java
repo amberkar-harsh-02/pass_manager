@@ -110,16 +110,19 @@ public class SecurityFragment extends Fragment {
 
         autofillSwitch.setOnClickListener(v -> {
             if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+                // Read from both the manager and the raw database to be 100% sure
                 boolean isCurrentlyEnabled = autofillManager != null && autofillManager.hasEnabledAutofillServices();
+                String defaultService = Settings.Secure.getString(requireContext().getContentResolver(), "autofill_service");
+                if (defaultService != null && defaultService.contains(requireContext().getPackageName())) {
+                    isCurrentlyEnabled = true;
+                }
 
                 if (!isCurrentlyEnabled) {
-                    // Turn it ON: Send them to Settings
-                    autofillSwitch.setChecked(false); // Keep it off visually until confirmed
+                    autofillSwitch.setChecked(false); // Force off visually until confirmed
                     Intent intent = new Intent(Settings.ACTION_REQUEST_SET_AUTOFILL_SERVICE);
                     intent.setData(Uri.parse("package:" + requireContext().getPackageName()));
                     startActivity(intent);
                 } else {
-                    // Turn it OFF: Force kill the service at the OS level!
                     if (autofillManager != null) {
                         autofillManager.disableAutofillServices();
                         autofillSwitch.setChecked(false);
@@ -139,9 +142,30 @@ public class SecurityFragment extends Fragment {
         syncAutofillSwitchState();
     }
 
+    @Override
+    public void onHiddenChanged(boolean hidden) {
+        super.onHiddenChanged(hidden);
+        if (!hidden) {
+            syncAutofillSwitchState();
+        }
+    }
+
     private void syncAutofillSwitchState() {
-        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O && autofillManager != null) {
-            boolean isLedgerActive = autofillManager.hasEnabledAutofillServices();
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+            boolean isLedgerActive = false;
+
+            // 1. The Standard Check
+            if (autofillManager != null && autofillManager.hasEnabledAutofillServices()) {
+                isLedgerActive = true;
+            }
+
+            // 2. THE SILVER BULLET: Check System Settings Directly
+            // This reads the raw OS database, completely bypassing Android's caching bugs.
+            String defaultService = Settings.Secure.getString(requireContext().getContentResolver(), "autofill_service");
+            if (defaultService != null && defaultService.contains(requireContext().getPackageName())) {
+                isLedgerActive = true;
+            }
+
             if (autofillSwitch != null) {
                 autofillSwitch.setChecked(isLedgerActive);
             }

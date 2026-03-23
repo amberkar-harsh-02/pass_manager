@@ -13,17 +13,19 @@ public class Credential {
     private String username;
     private String encryptedPassword;
     private String encryptionIv;
-
-    // NEW: The 4-Tier Health Score (0=Weak, 1=Moderate, 2=Strong, 3=Very Strong)
     private int healthScore;
 
-    // Update the constructor to accept the healthScore
-    public Credential(String title, String username, String encryptedPassword, String encryptionIv, int healthScore) {
+    // NEW: The Authenticator Secret Key
+    private String totpSecret;
+
+    // Update the constructor to accept the totpSecret
+    public Credential(String title, String username, String encryptedPassword, String encryptionIv, int healthScore, String totpSecret) {
         this.title = title;
         this.username = username;
         this.encryptedPassword = encryptedPassword;
         this.encryptionIv = encryptionIv;
         this.healthScore = healthScore;
+        this.totpSecret = totpSecret; // Assign the new variable
     }
 
     // Existing Getters and Setters...
@@ -33,8 +35,10 @@ public class Credential {
     public String getUsername() { return username; }
     public String getEncryptedPassword() { return encryptedPassword; }
     public String getEncryptionIv() { return encryptionIv; }
-
-    // NEW: Getter and Setter for Health Score
     public int getHealthScore() { return healthScore; }
     public void setHealthScore(int healthScore) { this.healthScore = healthScore; }
+
+    // NEW: Getter and Setter for TOTP Secret
+    public String getTotpSecret() { return totpSecret; }
+    public void setTotpSecret(String totpSecret) { this.totpSecret = totpSecret; }
 }

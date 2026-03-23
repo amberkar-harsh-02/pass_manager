@@ -3,7 +3,6 @@ package com.example.passmanager.ui.main;
 import android.os.Bundle;
 import android.widget.Button;
 import android.widget.EditText;
-import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.appcompat.app.AppCompatActivity;
@@ -20,6 +19,9 @@ public class EditCredentialActivity extends AppCompatActivity {
 
     private VaultViewModel vaultViewModel;
     private int credentialId;
+
+    // NEW: We need to hold onto the secret so we don't accidentally delete it!
+    private String existingTotpSecret = null;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -45,6 +47,11 @@ public class EditCredentialActivity extends AppCompatActivity {
             credentialId = intent.getIntExtra("CREDENTIAL_ID", -1);
             editTextTitle.setText(intent.getStringExtra("CREDENTIAL_TITLE"));
             editTextUsername.setText(intent.getStringExtra("CREDENTIAL_USERNAME"));
+
+            // Catch the 2FA secret (if it exists) so we can preserve it
+            if (intent.hasExtra("CREDENTIAL_TOTP_SECRET")) {
+                existingTotpSecret = intent.getStringExtra("CREDENTIAL_TOTP_SECRET");
+            }
 
             // Decrypt the old password so the user can see what they are replacing
             try {
@@ -80,10 +87,16 @@ public class EditCredentialActivity extends AppCompatActivity {
                 // Encrypt the new password
                 android.util.Pair<String, String> encryptedData = EncryptionUtil.encryptPassword(updatedPassword);
 
-                // Build the updated credential using the SAME ID so it overwrites the old one
+                // FIX: Build the updated credential using the SAME ID, and pass the existing TotpSecret back in!
                 Credential updatedCredential = new Credential(
-                        updatedTitle, updatedUsername, encryptedData.first, encryptedData.second, newHealthScore
+                        updatedTitle,
+                        updatedUsername,
+                        encryptedData.first,
+                        encryptedData.second,
+                        newHealthScore,
+                        existingTotpSecret
                 );
+
                 updatedCredential.setId(credentialId); // CRITICAL: This tells Room to update, not insert
 
                 vaultViewModel.update(updatedCredential);

@@ -2,13 +2,10 @@ package com.example.passmanager.ui.main;
 
 import static com.example.passmanager.SecurityUtil.generateSecurePassword;
 
-import java.security.SecureRandom;
 import android.os.Bundle;
-import android.util.Pair;
 import android.view.WindowManager;
 import android.widget.Button;
 import android.widget.EditText;
-import android.widget.Toast;
 
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.lifecycle.ViewModelProvider;
@@ -40,7 +37,6 @@ public class AddCredentialActivity extends AppCompatActivity {
         EditText editTextPassword = findViewById(R.id.edit_text_password);
         Button buttonSave = findViewById(R.id.button_save_credential);
 
-
         android.widget.Button buttonGenerate = findViewById(R.id.button_generate_password);
 
         buttonGenerate.setOnClickListener(v -> {
@@ -48,6 +44,7 @@ public class AddCredentialActivity extends AppCompatActivity {
             String newPassword = generateSecurePassword();
             editTextPassword.setText(newPassword);
         });
+
         buttonSave.setOnClickListener(v -> {
             String title = editTextTitle.getText().toString().trim();
             String username = editTextUsername.getText().toString().trim();
@@ -62,14 +59,14 @@ public class AddCredentialActivity extends AppCompatActivity {
                 // 1. CALCULATE HEALTH SCORE (Plaintext)
                 int healthScore = calculateHealthScore(password);
 
-                // 2. ENCRYPT THE PASSWORD (Using your Pair<String, String> method)
+                // 2. ENCRYPT THE PASSWORD
                 android.util.Pair<String, String> encryptedData = EncryptionUtil.encryptPassword(password);
                 String encryptedPassword = encryptedData.first; // The cipher text
                 String ivString = encryptedData.second;         // The IV
 
-                // 3. SAVE TO DATABASE (Now including the healthScore)
-                com.example.passmanager.data.model.Credential credential = new com.example.passmanager.data.model.Credential(
-                        title, username, encryptedPassword, ivString, healthScore
+                // 3. SAVE TO DATABASE (Added 'null' for the new totpSecret parameter)
+                Credential credential = new Credential(
+                        title, username, encryptedPassword, ivString, healthScore, null
                 );
 
                 vaultViewModel.insert(credential);
@@ -82,7 +79,7 @@ public class AddCredentialActivity extends AppCompatActivity {
             }
         });
     }
-    String generatedPassword = SecurityUtil.generateSecurePassword();
+
     private int calculateHealthScore(String password) {
         int score = 0;
         if (password == null || password.isEmpty()) return 0; // 0 = Weak

@@ -12,17 +12,16 @@ import androidx.sqlite.db.SupportSQLiteDatabase;
 import com.example.passmanager.data.model.AuditLog;
 import com.example.passmanager.data.model.Credential;
 
-// 1. We bump the version to 2 and add AuditLog.class to the entities list
-@Database(entities = {Credential.class, AuditLog.class}, version = 2, exportSchema = false)
+// 1. Bump version to 3 for the new Authenticator column
+@Database(entities = {Credential.class, AuditLog.class}, version = 3, exportSchema = false)
 public abstract class VaultDatabase extends RoomDatabase {
 
     public abstract CredentialDao credentialDao();
-    public abstract AuditLogDao auditLogDao(); // Expose the new DAO
+    public abstract AuditLogDao auditLogDao();
 
     private static volatile VaultDatabase INSTANCE;
 
-    // 2. THE SAFE MIGRATION SCRIPT
-    // This tells Room exactly how to build the new table without touching the existing passwords
+    // Original Migration (Audit Log)
     static final Migration MIGRATION_1_2 = new Migration(1, 2) {
         @Override
         public void migrate(@NonNull SupportSQLiteDatabase database) {
@@ -34,13 +33,22 @@ public abstract class VaultDatabase extends RoomDatabase {
         }
     };
 
+    // 2. NEW MIGRATION: Add the totpSecret column to existing credentials
+    static final Migration MIGRATION_2_3 = new Migration(2, 3) {
+        @Override
+        public void migrate(@NonNull SupportSQLiteDatabase database) {
+            database.execSQL("ALTER TABLE credentials_table ADD COLUMN totpSecret TEXT");
+        }
+    };
+
     public static VaultDatabase getDatabase(final Context context) {
         if (INSTANCE == null) {
             synchronized (VaultDatabase.class) {
                 if (INSTANCE == null) {
                     INSTANCE = Room.databaseBuilder(context.getApplicationContext(),
                                     VaultDatabase.class, "password_vault_database")
-                            .addMigrations(MIGRATION_1_2) // 3. Inject the migration here!
+                            // 3. Add BOTH migrations so the app knows how to upgrade from any older version
+                            .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
                             .fallbackToDestructiveMigration()
                             .build();
                 }

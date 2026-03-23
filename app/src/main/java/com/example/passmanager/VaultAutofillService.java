@@ -196,7 +196,7 @@ public class VaultAutofillService extends AutofillService {
             java.util.concurrent.Executors.newSingleThreadExecutor().execute(() -> {
                 try {
                     android.util.Pair<String, String> encryptedData = EncryptionUtil.encryptPassword(pass);
-                    Credential newAccount = new Credential(finalDbTitle, user, encryptedData.first, encryptedData.second, 1);
+                    Credential newAccount = new Credential(finalDbTitle, user, encryptedData.first, encryptedData.second, 1, null);
 
                     CredentialRepository repo = new CredentialRepository(getApplication());
                     repo.insert(newAccount);

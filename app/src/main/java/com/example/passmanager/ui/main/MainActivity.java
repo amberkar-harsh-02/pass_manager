@@ -56,7 +56,6 @@ public class MainActivity extends AppCompatActivity {
         getSharedPreferences("VaultSecurityPrefs", MODE_PRIVATE)
                 .edit().putLong("LAST_BACKGROUND_TIME", 0).apply();
 
-        // --- CHECK THREAT LEVEL ---
         // --- CHECK THREAT LEVEL (VOLATILE MEMORY) ---
         boolean isDuressMode = getIntent().getBooleanExtra("IS_DURESS_MODE", false);
 
@@ -130,8 +129,18 @@ public class MainActivity extends AppCompatActivity {
                     fabAdd.setVisibility(View.GONE);
                 }
                 return true;
+            } else if (itemId == R.id.nav_authenticator) {
+                // --- NEW: Load the Authenticator Fragment ---
+                recyclerView.setVisibility(View.GONE);
+                fabAdd.setVisibility(View.GONE);
+                searchBar.setVisibility(View.GONE);
+                fragmentContainer.setVisibility(View.VISIBLE);
+
+                getSupportFragmentManager().beginTransaction()
+                        .replace(R.id.fragment_container, new AuthenticatorFragment())
+                        .commit();
+                return true;
             } else if (itemId == R.id.nav_security) {
-                // --- NEW: Load the Security Fragment ---
                 recyclerView.setVisibility(View.GONE);
                 fabAdd.setVisibility(View.GONE);
                 searchBar.setVisibility(View.GONE);
@@ -170,7 +179,7 @@ public class MainActivity extends AppCompatActivity {
                                 clipboard.setPrimaryClip(clip);
                                 android.widget.Toast.makeText(MainActivity.this, "Copied to clipboard", android.widget.Toast.LENGTH_SHORT).show();
                             })
-                            // --- NEW: QR CODE BRIDGE BUTTON ---
+                            // --- QR CODE BRIDGE BUTTON ---
                             .setNegativeButton("Scan to Fill", (dialog, which) -> {
                                 // 1. Save the decrypted password to RAM
                                 pendingInjectionPayload = decryptedPassword;
@@ -183,7 +192,7 @@ public class MainActivity extends AppCompatActivity {
                                 options.setCameraId(0);
                                 options.setBeepEnabled(false);
 
-                                // --- NEW: FORCE PORTRAIT MODE ---
+                                // --- FORCE PORTRAIT MODE ---
                                 options.setCaptureActivity(PortraitCaptureActivity.class);
                                 options.setOrientationLocked(true);
 
@@ -236,6 +245,9 @@ public class MainActivity extends AppCompatActivity {
                         intent.putExtra("CREDENTIAL_USERNAME", targetCredential.getUsername());
                         intent.putExtra("CREDENTIAL_ENCRYPTED_PW", targetCredential.getEncryptedPassword());
                         intent.putExtra("CREDENTIAL_IV", targetCredential.getEncryptionIv());
+
+                        // Pass the TOTP Secret so it doesn't get wiped!
+                        intent.putExtra("CREDENTIAL_TOTP_SECRET", targetCredential.getTotpSecret());
 
                         startActivity(intent);
                     });
@@ -352,7 +364,7 @@ public class MainActivity extends AppCompatActivity {
 
                             // 2. Build the Credential Entity (HealthScore hardcoded to 3 for generated strings)
                             com.example.passmanager.data.model.Credential newAccount =
-                                    new com.example.passmanager.data.model.Credential(capturedTitle, capturedUser, cipherText, iv, 3);
+                                    new com.example.passmanager.data.model.Credential(capturedTitle, capturedUser, cipherText, iv, 3, null);
 
                             // 3. Connect to your existing ViewModel
                             com.example.passmanager.ui.viewmodel.VaultViewModel vaultViewModel =

@@ -11,9 +11,12 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.view.WindowManager;
 import android.view.autofill.AutofillManager;
+import android.widget.EditText;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import androidx.activity.result.ActivityResultLauncher;
+import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.appcompat.widget.SwitchCompat;
@@ -22,11 +25,18 @@ import androidx.lifecycle.ViewModelProvider;
 
 import com.example.passmanager.R;
 import com.example.passmanager.data.model.Credential;
+import com.example.passmanager.security.BackupEncryptionUtil;
 import com.example.passmanager.security.EncryptionUtil;
 import com.example.passmanager.ui.viewmodel.VaultViewModel;
 import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 import com.google.android.material.switchmaterial.SwitchMaterial;
 
+import org.json.JSONArray;
+import org.json.JSONObject;
+
+import java.io.ByteArrayOutputStream;
+import java.io.InputStream;
+import java.io.OutputStream;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -39,11 +49,36 @@ public class SecurityFragment extends Fragment {
     private List<com.example.passmanager.data.model.AuditLog> currentLogs = new java.util.ArrayList<>();
     private List<Credential> currentVault = new ArrayList<>();
 
+    // Elevated to class level so our Import function can use it
+    private VaultViewModel vaultViewModel;
+
     private AutofillManager autofillManager;
     private SwitchMaterial autofillSwitch;
 
     private final String[] timeoutOptions = {"Immediately", "1 Minute", "5 Minutes", "Never"};
     private final long[] timeoutValues = {0, 60000, 300000, -1};
+
+    // --- SAF FILE PICKER LAUNCHERS ---
+
+    // 1. Export (Save File) Launcher
+    private final ActivityResultLauncher<Intent> exportFileLauncher = registerForActivityResult(
+            new ActivityResultContracts.StartActivityForResult(),
+            result -> {
+                if (result.getResultCode() == requireActivity().RESULT_OK && result.getData() != null) {
+                    Uri uri = result.getData().getData();
+                    promptForBackupPassword(uri, true);
+                }
+            });
+
+    // 2. Import (Open File) Launcher
+    private final ActivityResultLauncher<Intent> importFileLauncher = registerForActivityResult(
+            new ActivityResultContracts.StartActivityForResult(),
+            result -> {
+                if (result.getResultCode() == requireActivity().RESULT_OK && result.getData() != null) {
+                    Uri uri = result.getData().getData();
+                    promptForBackupPassword(uri, false);
+                }
+            });
 
     @Nullable
     @Override
@@ -54,7 +89,7 @@ public class SecurityFragment extends Fragment {
         textAutoLockStatus = view.findViewById(R.id.text_auto_lock_status);
 
         // --- CONNECT TO DATABASE FOR THE AUDIT ---
-        VaultViewModel vaultViewModel = new ViewModelProvider(requireActivity()).get(VaultViewModel.class);
+        vaultViewModel = new ViewModelProvider(requireActivity()).get(VaultViewModel.class);
         vaultViewModel.getAllCredentials().observe(getViewLifecycleOwner(), credentials -> {
             if (credentials != null) {
                 currentVault = credentials;
@@ -101,6 +136,13 @@ public class SecurityFragment extends Fragment {
         View btnSetupDuress = view.findViewById(R.id.btn_setup_duress);
         btnSetupDuress.setOnClickListener(v -> showDuressPinDialog());
 
+        // --- NEW: BACKUP & RESTORE BUTTONS ---
+        View btnExportVault = view.findViewById(R.id.btn_export_vault);
+        if(btnExportVault != null) btnExportVault.setOnClickListener(v -> triggerExportFlow());
+
+        View btnImportVault = view.findViewById(R.id.btn_import_vault);
+        if(btnImportVault != null) btnImportVault.setOnClickListener(v -> triggerImportFlow());
+
         // --- 4. AUTOFILL TOGGLE LOGIC ---
         autofillSwitch = view.findViewById(R.id.switch_autofill);
 
@@ -133,6 +175,142 @@ public class SecurityFragment extends Fragment {
         });
 
         return view;
+    }
+
+    // --- SAF BACKUP & RESTORE LOGIC ---
+
+    private void triggerExportFlow() {
+        if (currentVault.isEmpty()) {
+            Toast.makeText(getContext(), "Vault is empty. Nothing to export.", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        Intent intent = new Intent(Intent.ACTION_CREATE_DOCUMENT);
+        intent.addCategory(Intent.CATEGORY_OPENABLE);
+        intent.setType("application/octet-stream");
+        intent.putExtra(Intent.EXTRA_TITLE, "vault_backup.ledger");
+        exportFileLauncher.launch(intent);
+    }
+
+    private void triggerImportFlow() {
+        Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT);
+        intent.addCategory(Intent.CATEGORY_OPENABLE);
+        intent.setType("*/*"); // Accept all files, but we expect .ledger
+        importFileLauncher.launch(intent);
+    }
+
+    private void promptForBackupPassword(Uri uri, boolean isExporting) {
+        final EditText input = new EditText(requireContext());
+        input.setInputType(android.text.InputType.TYPE_CLASS_TEXT | android.text.InputType.TYPE_TEXT_VARIATION_PASSWORD);
+        input.setHint(isExporting ? "Create Backup Password" : "Enter Backup Password");
+
+        android.widget.FrameLayout container = new android.widget.FrameLayout(requireContext());
+        android.widget.FrameLayout.LayoutParams params = new android.widget.FrameLayout.LayoutParams(
+                android.view.ViewGroup.LayoutParams.MATCH_PARENT, android.view.ViewGroup.LayoutParams.WRAP_CONTENT);
+        params.setMargins(50, 20, 50, 0);
+        input.setLayoutParams(params);
+        container.addView(input);
+
+        new MaterialAlertDialogBuilder(requireContext())
+                .setTitle(isExporting ? "Encrypt Backup" : "Decrypt Backup")
+                .setMessage(isExporting ? "Create a strong password. If you lose this, your backup cannot be recovered." : "Enter the password used to encrypt this file.")
+                .setView(container)
+                .setPositiveButton(isExporting ? "Encrypt & Save" : "Decrypt & Merge", (dialog, which) -> {
+                    String password = input.getText().toString();
+                    if (password.length() < 4) {
+                        Toast.makeText(getContext(), "Password must be at least 4 characters", Toast.LENGTH_SHORT).show();
+                        return;
+                    }
+
+                    if (isExporting) {
+                        executeExport(uri, password);
+                    } else {
+                        executeImport(uri, password);
+                    }
+                })
+                .setNegativeButton("Cancel", null)
+                .show();
+    }
+
+    private void executeExport(Uri fileUri, String password) {
+        try {
+            // 1. Serialize Room Data to JSON
+            JSONArray jsonArray = new JSONArray();
+            for (Credential c : currentVault) {
+                JSONObject obj = new JSONObject();
+                obj.put("title", c.getTitle());
+                obj.put("username", c.getUsername());
+                obj.put("encryptedPassword", c.getEncryptedPassword());
+                obj.put("encryptionIv", c.getEncryptionIv());
+                obj.put("healthScore", c.getHealthScore());
+                obj.put("totpSecret", c.getTotpSecret() != null ? c.getTotpSecret() : "");
+                jsonArray.put(obj);
+            }
+
+            // 2. Encrypt the JSON String
+            byte[] encryptedBytes = BackupEncryptionUtil.encryptBackup(jsonArray.toString(), password);
+
+            // 3. Write to the SAF File
+            OutputStream os = requireContext().getContentResolver().openOutputStream(fileUri);
+            if (os != null) {
+                os.write(encryptedBytes);
+                os.close();
+                Toast.makeText(getContext(), "Backup Encrypted and Saved Successfully!", Toast.LENGTH_LONG).show();
+            }
+
+        } catch (Exception e) {
+            e.printStackTrace();
+            Toast.makeText(getContext(), "Export Failed: " + e.getMessage(), Toast.LENGTH_LONG).show();
+        }
+    }
+
+    private void executeImport(Uri fileUri, String password) {
+        try {
+            // 1. Read the bytes from the SAF File
+            InputStream is = requireContext().getContentResolver().openInputStream(fileUri);
+            ByteArrayOutputStream buffer = new ByteArrayOutputStream();
+            int nRead;
+            byte[] data = new byte[16384];
+            while ((nRead = is.read(data, 0, data.length)) != -1) {
+                buffer.write(data, 0, nRead);
+            }
+            is.close();
+            byte[] fileBytes = buffer.toByteArray();
+
+            // 2. Decrypt back to JSON
+            String jsonString = BackupEncryptionUtil.decryptBackup(fileBytes, password);
+
+            // 3. Parse JSON and Insert into DB (The Merge Option)
+            JSONArray jsonArray = new JSONArray(jsonString);
+            int importedCount = 0;
+
+            for (int i = 0; i < jsonArray.length(); i++) {
+                JSONObject obj = jsonArray.getJSONObject(i);
+
+                String totp = obj.optString("totpSecret", "");
+                if (totp.isEmpty()) totp = null; // Clean up empty strings to null for Room
+
+                Credential c = new Credential(
+                        obj.getString("title"),
+                        obj.getString("username"),
+                        obj.getString("encryptedPassword"),
+                        obj.getString("encryptionIv"),
+                        obj.getInt("healthScore"),
+                        totp
+                );
+
+                // Insert alongside existing data!
+                vaultViewModel.insert(c);
+                importedCount++;
+            }
+
+            Toast.makeText(getContext(), "Successfully merged " + importedCount + " accounts into your vault!", Toast.LENGTH_LONG).show();
+
+        } catch (javax.crypto.AEADBadTagException e) {
+            Toast.makeText(getContext(), "Import Failed: Incorrect Password!", Toast.LENGTH_LONG).show();
+        } catch (Exception e) {
+            e.printStackTrace();
+            Toast.makeText(getContext(), "Import Failed: File might be corrupted.", Toast.LENGTH_LONG).show();
+        }
     }
 
     // Every time the user looks at this tab, sync the switch with the actual system truth

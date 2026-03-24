@@ -305,15 +305,31 @@ public class MainActivity extends AppCompatActivity {
 
             if (timeAway >= timeoutSetting) {
                 // LOCK TRIGGERED!
-                // 1. Hide the Vault contents immediately to prevent visual leaks
+                // 1. Hide all sensitive elements immediately to prevent visual leaks
                 findViewById(R.id.recyclerView_credentials).setVisibility(View.GONE);
                 findViewById(R.id.fragment_container).setVisibility(View.GONE);
+                findViewById(R.id.edit_text_search).setVisibility(View.GONE);
+                findViewById(R.id.fab_add_password).setVisibility(View.GONE);
 
                 // 2. Throw the Biometric Prompt
                 authenticateUser(() -> {
-                    // 3. On Success: Restore the UI based on what tab they were on
+                    // 3. On Success: GRACEFULLY restore visibility based on the current tab!
+                    // (We removed the destructive 'setSelectedItemId' refresh here)
                     BottomNavigationView bottomNav = findViewById(R.id.bottom_navigation);
-                    bottomNav.setSelectedItemId(bottomNav.getSelectedItemId()); // Refreshes current tab
+                    int currentTab = bottomNav.getSelectedItemId();
+
+                    if (currentTab == R.id.nav_vault) {
+                        findViewById(R.id.recyclerView_credentials).setVisibility(View.VISIBLE);
+                        findViewById(R.id.edit_text_search).setVisibility(View.VISIBLE);
+
+                        boolean isDuressMode = getIntent().getBooleanExtra("IS_DURESS_MODE", false);
+                        if (!isDuressMode) {
+                            findViewById(R.id.fab_add_password).setVisibility(View.VISIBLE);
+                        }
+                    } else {
+                        // For Home, 2FA, Security, and About tabs
+                        findViewById(R.id.fragment_container).setVisibility(View.VISIBLE);
+                    }
 
                     // Reset the background timer so it doesn't instantly lock again
                     prefs.edit().putLong("LAST_BACKGROUND_TIME", 0).apply();

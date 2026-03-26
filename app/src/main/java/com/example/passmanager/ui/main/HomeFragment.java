@@ -19,7 +19,9 @@ import com.example.passmanager.data.model.Credential;
 import com.example.passmanager.ui.viewmodel.VaultViewModel;
 
 import java.util.ArrayList;
+import java.util.Calendar;
 import java.util.List;
+import java.util.Random;
 
 public class HomeFragment extends Fragment {
 
@@ -27,6 +29,11 @@ public class HomeFragment extends Fragment {
     private TextView textTotalPasswords;
     private TextView textWeakPasswords;
     private TextView textStrongPasswords;
+
+    // Split the text views
+    private TextView textHeaderGreeting;
+    private TextView textQuip;
+
     private CredentialAdapter adapter;
 
     @Nullable
@@ -37,6 +44,13 @@ public class HomeFragment extends Fragment {
         textTotalPasswords = view.findViewById(R.id.text_total_passwords);
         textWeakPasswords = view.findViewById(R.id.text_weak_passwords);
         textStrongPasswords = view.findViewById(R.id.text_strong_passwords);
+
+        // Link the new IDs
+        textHeaderGreeting = view.findViewById(R.id.textHeaderGreeting);
+        textQuip = view.findViewById(R.id.textQuip);
+
+        // --- SETUP DYNAMIC GREETING ---
+        setupStandUpGreeting();
 
         // --- Setup the Vulnerability List ---
         RecyclerView recyclerView = view.findViewById(R.id.recyclerView_vulnerabilities);
@@ -93,5 +107,48 @@ public class HomeFragment extends Fragment {
         });
 
         return view;
+    }
+
+    private void setupStandUpGreeting() {
+        if (textHeaderGreeting == null || textQuip == null) return;
+
+        String firstName = "Harsh";
+
+        // 1. Get the time of day for the standard intro (Removed line breaks)
+        Calendar c = Calendar.getInstance();
+        int timeOfDay = c.get(Calendar.HOUR_OF_DAY);
+        String timeGreeting;
+
+        if (timeOfDay >= 6 && timeOfDay < 12) {
+            timeGreeting = "Good Morning, " + firstName;
+        } else if (timeOfDay >= 12 && timeOfDay < 16) {
+            timeGreeting = "Good Afternoon, " + firstName;
+        } else if (timeOfDay >= 16 && timeOfDay < 21) {
+            timeGreeting = "Good Evening, " + firstName;
+        } else {
+            timeGreeting = "Up late, " + firstName + "?";
+        }
+
+        // 2. The Arsenal of Material
+        String[] securityQuips = {
+                "Treat your passwords like your toothbrush: don't share them.",
+                "'password123' is a punchline, not a key.",
+                "My password is the last 8 digits of Pi. Good luck.",
+                "Ah shit, here we go again... time to audit those credentials.",
+                "Your password is like a joke. If you have to explain it, it's not strong enough.",
+                "There are 10 types of people: those who understand binary, and those who get breached.",
+                "Dance like nobody's watching. Encrypt like everyone is.",
+                "Why did the hacker go broke? He couldn't find the cache.",
+                "Passwords are like underwear: you don't let people see it, you should change it very often, and you shouldn't share it with strangers."
+        };
+
+        // 3. Pick a random quip
+        Random random = new Random();
+        int randomIndex = random.nextInt(securityQuips.length);
+        String selectedQuip = securityQuips[randomIndex];
+
+        // 4. Apply to the separate text views
+        textHeaderGreeting.setText(timeGreeting);
+        textQuip.setText(selectedQuip);
     }
 }

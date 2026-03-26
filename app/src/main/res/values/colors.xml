@@ -7,4 +7,8 @@
 
     <color name="vault_text_primary">#E0E0E0</color>
     <color name="vault_text_secondary">#9E9E9E</color>
+    <color name="primary_brand">#2962FF</color>
+
+    <color name="nav_item_active">#2962FF</color>
+    <color name="nav_item_inactive">#808080</color>
 </resources>

@@ -9,11 +9,27 @@
     android:fitsSystemWindows="true"
     tools:context=".ui.main.MainActivity">
 
+    <TextView
+        android:id="@+id/text_vault_title"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginHorizontal="16dp"
+        android:layout_marginTop="24dp"
+        android:text="My Vault"
+        android:textColor="@color/vault_accent"
+        android:textSize="28sp"
+        android:textStyle="bold"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent" />
+
     <EditText
         android:id="@+id/edit_text_search"
         android:layout_width="0dp"
         android:layout_height="wrap_content"
-        android:layout_margin="16dp"
+        android:layout_marginHorizontal="16dp"
+        android:layout_marginTop="16dp"
+        android:layout_marginBottom="8dp"
         android:backgroundTint="@color/vault_accent"
         android:hint="Search Vault..."
         android:textColorHint="@color/vault_text_secondary"
@@ -22,7 +38,7 @@
         android:maxLines="1"
         android:drawableStart="@android:drawable/ic_menu_search"
         android:drawablePadding="8dp"
-        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintTop_toBottomOf="@+id/text_vault_title"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent" />
 
@@ -53,8 +69,8 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:background="@color/vault_surface"
-        app:itemIconTint="@color/vault_accent"
-        app:itemTextColor="@color/vault_text_primary"
+        app:itemIconTint="@color/bottom_nav_color_state"
+        app:itemTextColor="@color/bottom_nav_color_state"
         app:menu="@menu/bottom_nav_menu"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintStart_toStartOf="parent"

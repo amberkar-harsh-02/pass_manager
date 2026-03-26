@@ -4,6 +4,7 @@ import android.graphics.Bitmap;
 import android.os.Bundle;
 import android.view.View;
 import android.view.WindowManager;
+import android.view.animation.AnimationUtils;
 import android.widget.EditText;
 import android.widget.FrameLayout;
 import android.widget.Toast;
@@ -41,6 +42,9 @@ public class MainActivity extends AppCompatActivity {
     private String pendingInjectionPayload = null;
     private String pendingUsernamePayload = null;
     private String pendingTitlePayload = null;
+
+    // Tracks the currently active tab to prevent re-click animations
+    private int currentTabId = R.id.nav_home;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -110,17 +114,40 @@ public class MainActivity extends AppCompatActivity {
         // --- 5. NAV BAR LOGIC ---
         bottomNav.setOnItemSelectedListener(item -> {
             int itemId = item.getItemId();
+
+            // PREVENT RE-CLICK ANIMATIONS
+            if (itemId == currentTabId) {
+                return true;
+            }
+            currentTabId = itemId;
+
+            // Check if fragment container was hidden (used for View Animation later)
+            boolean wasFragmentContainerHidden = fragmentContainer.getVisibility() == View.GONE;
+
             if (itemId == R.id.nav_home) {
                 recyclerView.setVisibility(View.GONE);
                 fabAdd.setVisibility(View.GONE);
                 searchBar.setVisibility(View.GONE);
                 fragmentContainer.setVisibility(View.VISIBLE);
-                getSupportFragmentManager().beginTransaction().replace(R.id.fragment_container, new HomeFragment()).commit();
+
+                // If coming from Vault, animate the whole container UP
+                if (wasFragmentContainerHidden) {
+                    fragmentContainer.startAnimation(AnimationUtils.loadAnimation(this, R.anim.slide_up_enter));
+                }
+
+                getSupportFragmentManager().beginTransaction()
+                        .setCustomAnimations(R.anim.slide_up_enter, R.anim.fade_out_exit)
+                        .replace(R.id.fragment_container, new HomeFragment())
+                        .commit();
                 return true;
+
             } else if (itemId == R.id.nav_vault) {
                 fragmentContainer.setVisibility(View.GONE);
                 recyclerView.setVisibility(View.VISIBLE);
                 searchBar.setVisibility(View.VISIBLE);
+
+                // ANIMATE THE VAULT RECYCLER VIEW MANUALLY UP
+                recyclerView.startAnimation(AnimationUtils.loadAnimation(this, R.anim.slide_up_enter));
 
                 // Only show the Add button if we are NOT in Duress Mode
                 if (!isDuressMode) {
@@ -129,29 +156,43 @@ public class MainActivity extends AppCompatActivity {
                     fabAdd.setVisibility(View.GONE);
                 }
                 return true;
+
             } else if (itemId == R.id.nav_authenticator) {
-                // --- NEW: Load the Authenticator Fragment ---
                 recyclerView.setVisibility(View.GONE);
                 fabAdd.setVisibility(View.GONE);
                 searchBar.setVisibility(View.GONE);
                 fragmentContainer.setVisibility(View.VISIBLE);
 
+                if (wasFragmentContainerHidden) {
+                    fragmentContainer.startAnimation(AnimationUtils.loadAnimation(this, R.anim.slide_up_enter));
+                }
+
                 getSupportFragmentManager().beginTransaction()
+                        .setCustomAnimations(R.anim.slide_up_enter, R.anim.fade_out_exit)
                         .replace(R.id.fragment_container, new AuthenticatorFragment())
                         .commit();
                 return true;
+
             } else if (itemId == R.id.nav_security) {
                 recyclerView.setVisibility(View.GONE);
                 fabAdd.setVisibility(View.GONE);
                 searchBar.setVisibility(View.GONE);
                 fragmentContainer.setVisibility(View.VISIBLE);
 
+                if (wasFragmentContainerHidden) {
+                    fragmentContainer.startAnimation(AnimationUtils.loadAnimation(this, R.anim.slide_up_enter));
+                }
+
                 getSupportFragmentManager().beginTransaction()
+                        .setCustomAnimations(R.anim.slide_up_enter, R.anim.fade_out_exit)
                         .replace(R.id.fragment_container, new SecurityFragment())
                         .commit();
                 return true;
+
             } else if (itemId == R.id.nav_about) {
                 Toast.makeText(MainActivity.this, "Coming soon", Toast.LENGTH_SHORT).show();
+                // Reset the tab tracker if they click "About" since it just shows a Toast
+                currentTabId = bottomNav.getSelectedItemId();
                 return true;
             }
             return false;
@@ -314,7 +355,6 @@ public class MainActivity extends AppCompatActivity {
                 // 2. Throw the Biometric Prompt
                 authenticateUser(() -> {
                     // 3. On Success: GRACEFULLY restore visibility based on the current tab!
-                    // (We removed the destructive 'setSelectedItemId' refresh here)
                     BottomNavigationView bottomNav = findViewById(R.id.bottom_navigation);
                     int currentTab = bottomNav.getSelectedItemId();
 

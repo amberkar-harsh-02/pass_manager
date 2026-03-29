@@ -190,9 +190,19 @@ public class MainActivity extends AppCompatActivity {
                 return true;
 
             } else if (itemId == R.id.nav_about) {
-                Toast.makeText(MainActivity.this, "Coming soon", Toast.LENGTH_SHORT).show();
-                // Reset the tab tracker if they click "About" since it just shows a Toast
-                currentTabId = bottomNav.getSelectedItemId();
+                recyclerView.setVisibility(View.GONE);
+                fabAdd.setVisibility(View.GONE);
+                searchBar.setVisibility(View.GONE);
+                fragmentContainer.setVisibility(View.VISIBLE);
+
+                if (wasFragmentContainerHidden) {
+                    fragmentContainer.startAnimation(AnimationUtils.loadAnimation(this, R.anim.slide_up_enter));
+                }
+
+                getSupportFragmentManager().beginTransaction()
+                        .setCustomAnimations(R.anim.slide_up_enter, R.anim.fade_out_exit)
+                        .replace(R.id.fragment_container, new AboutFragment()) // Loads the new page
+                        .commit();
                 return true;
             }
             return false;

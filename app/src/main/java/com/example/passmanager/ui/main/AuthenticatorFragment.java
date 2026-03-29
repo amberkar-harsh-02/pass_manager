@@ -23,6 +23,7 @@ import com.example.passmanager.R;
 import com.example.passmanager.data.model.Credential;
 import com.example.passmanager.ui.viewmodel.VaultViewModel;
 import com.google.android.material.dialog.MaterialAlertDialogBuilder;
+import com.google.android.material.floatingactionbutton.FloatingActionButton;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -55,15 +56,35 @@ public class AuthenticatorFragment extends Fragment {
 
         textEmpty = view.findViewById(R.id.text_empty_auth);
         RecyclerView recyclerView = view.findViewById(R.id.recycler_authenticator);
+        FloatingActionButton fabAdd = view.findViewById(R.id.fab_add_auth);
+
         recyclerView.setLayoutManager(new LinearLayoutManager(getContext()));
 
         adapter = new AuthenticatorAdapter(requireContext());
         recyclerView.setAdapter(adapter);
 
+        // --- DURESS MODE CHECK ---
+        boolean isDuressMode = requireActivity().getIntent().getBooleanExtra("IS_DURESS_MODE", false);
+
+        // If in Duress Mode, hide the ability to add new keys
+        if (isDuressMode) {
+            fabAdd.setVisibility(View.GONE);
+        }
+
         vaultViewModel = new ViewModelProvider(requireActivity()).get(VaultViewModel.class);
 
         // 1. Observe the Vault and Filter for 2FA Codes
         vaultViewModel.getAllCredentials().observe(getViewLifecycleOwner(), credentials -> {
+
+            // THE DURESS INTERCEPTOR: If compromised, force the list to be empty and break out early
+            if (isDuressMode) {
+                adapter.setCredentials(new ArrayList<>());
+                textEmpty.setVisibility(View.VISIBLE);
+                textEmpty.setText("No 2FA Codes Configured.\n\nYour vault is currently empty."); // Slightly stealthier text
+                return;
+            }
+
+            // STANDARD OPERATION: Load the real keys
             if (credentials != null) {
                 allVaultCredentials = credentials; // Keep a copy of everything for the "Add" menu
 
@@ -76,11 +97,16 @@ public class AuthenticatorFragment extends Fragment {
 
                 adapter.setCredentials(authList);
                 textEmpty.setVisibility(authList.isEmpty() ? View.VISIBLE : View.GONE);
+
+                // Ensure default text is set if not under duress
+                if (authList.isEmpty()) {
+                    textEmpty.setText("No 2FA Codes Configured\n\nTap + to link an account.");
+                }
             }
         });
 
         // 2. The Link Button
-        view.findViewById(R.id.fab_add_auth).setOnClickListener(v -> showLinkAuthenticatorDialog());
+        fabAdd.setOnClickListener(v -> showLinkAuthenticatorDialog());
 
         return view;
     }

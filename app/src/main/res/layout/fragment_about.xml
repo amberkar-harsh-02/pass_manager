@@ -81,6 +81,7 @@
                     android:text="Field Manual &amp; Protocol"
                     android:textColor="@color/vault_text_primary"
                     android:textSize="16sp" />
+
             </LinearLayout>
 
         </com.google.android.material.card.MaterialCardView>
@@ -103,10 +104,22 @@
             app:cardCornerRadius="12dp"
             app:cardElevation="2dp">
 
+
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="vertical">
+
+                <Button
+                    android:id="@+id/btn_share"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_margin="16dp"
+                    android:text="Get Desktop Browser Extension"
+                    android:textColor="@color/vault_background"
+                    android:backgroundTint="@color/vault_accent"
+                    app:icon="@drawable/share"
+                    app:iconTint="@color/vault_background"/>
 
                 <LinearLayout
                     android:id="@+id/row_restart_bridge"

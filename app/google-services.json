@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "51712373939",
+    "project_id": "ledger-58bbd",
+    "storage_bucket": "ledger-58bbd.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:51712373939:android:0650554ebfd86c4061acc6",
+        "android_client_info": {
+          "package_name": "com.example.passmanager"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDPI-lQASomGvwSYGG60qtqm4h8WRWskGw"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

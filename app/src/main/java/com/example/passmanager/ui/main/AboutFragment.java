@@ -1,9 +1,11 @@
 package com.example.passmanager.ui.main;
 
+import android.content.Intent;
 import android.os.Bundle;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.Button;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -28,6 +30,23 @@ public class AboutFragment extends Fragment {
         LinearLayout rowFieldManual = view.findViewById(R.id.row_field_manual);
         LinearLayout rowRestartBridge = view.findViewById(R.id.row_restart_bridge);
         LinearLayout rowClearCache = view.findViewById(R.id.row_clear_cache);
+
+        // Link the new share button from your XML
+        Button btnShareExtension = view.findViewById(R.id.btn_share);
+
+        // --- 0. Share Desktop Extension ---
+        btnShareExtension.setOnClickListener(v -> {
+            String extensionLink = "https://github.com/amberkar-harsh-02/Ledger-extension/releases/latest";
+            String shareMessage = "Install the Ledger Browser Injector on your PC to link with your vault:\n\n" + extensionLink;
+
+            Intent sendIntent = new Intent();
+            sendIntent.setAction(Intent.ACTION_SEND);
+            sendIntent.putExtra(Intent.EXTRA_TEXT, shareMessage);
+            sendIntent.setType("text/plain");
+
+            Intent shareIntent = Intent.createChooser(sendIntent, "Send Extension Link to PC");
+            startActivity(shareIntent);
+        });
 
         // --- 1. The Easter Egg ---
         textVersion.setOnClickListener(v -> {

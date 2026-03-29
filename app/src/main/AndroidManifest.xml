@@ -21,17 +21,22 @@
         android:theme="@style/Theme.PassManager">
 
         <activity
-            android:name=".ui.main.MainActivity"
-            android:exported="false" />
-
-        <activity
-            android:name=".ui.main.LockScreenActivity"
-            android:exported="true">
+            android:name=".ui.main.WelcomeActivity"
+            android:exported="true"
+            android:theme="@style/Theme.PassManager">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <activity
+            android:name=".ui.main.MainActivity"
+            android:exported="false" />
+
+        <activity
+            android:name=".ui.main.LockScreenActivity"
+            android:exported="false" />
 
         <activity
             android:name=".ui.main.AddCredentialActivity"

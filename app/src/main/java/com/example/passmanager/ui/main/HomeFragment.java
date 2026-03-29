@@ -112,14 +112,16 @@ public class HomeFragment extends Fragment {
     private void setupStandUpGreeting() {
         if (textHeaderGreeting == null || textQuip == null) return;
 
-        String firstName = "Harsh";
+        // FETCH THE NAME DYNAMICALLY! Fallback to "Agent" if not found.
+        android.content.SharedPreferences prefs = requireContext().getSharedPreferences("VaultSecurityPrefs", android.content.Context.MODE_PRIVATE);
+        String firstName = prefs.getString("USER_FIRST_NAME", "Agent");
 
-        // 1. Get the time of day for the standard intro (Removed line breaks)
+        // 1. Get the time of day for the standard intro
         Calendar c = Calendar.getInstance();
         int timeOfDay = c.get(Calendar.HOUR_OF_DAY);
         String timeGreeting;
 
-        if (timeOfDay >= 6 && timeOfDay < 12) {
+        if (timeOfDay >= 0 && timeOfDay < 12) {
             timeGreeting = "Good Morning, " + firstName;
         } else if (timeOfDay >= 12 && timeOfDay < 16) {
             timeGreeting = "Good Afternoon, " + firstName;

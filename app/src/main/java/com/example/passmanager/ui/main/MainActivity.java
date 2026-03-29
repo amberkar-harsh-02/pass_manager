@@ -1,6 +1,5 @@
 package com.example.passmanager.ui.main;
 
-import android.graphics.Bitmap;
 import android.os.Bundle;
 import android.view.View;
 import android.view.WindowManager;
@@ -19,10 +18,8 @@ import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.example.passmanager.PortraitCaptureActivity;
-import com.example.passmanager.QRCodeHelper;
 import com.example.passmanager.R;
 import com.example.passmanager.SecurityUtil;
-import com.example.passmanager.data.model.Credential;
 import com.example.passmanager.security.EncryptionUtil;
 import com.example.passmanager.ui.viewmodel.VaultViewModel;
 import com.google.android.material.bottomnavigation.BottomNavigationView;
@@ -50,10 +47,10 @@ public class MainActivity extends AppCompatActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
-        // SECURITY: Block screenshots
+        // --- 1. SECURITY: Block screenshots ---
         getWindow().setFlags(WindowManager.LayoutParams.FLAG_SECURE, WindowManager.LayoutParams.FLAG_SECURE);
 
-        // 1. PAINT THE SCREEN FIRST!
+        // 2. PAINT THE SCREEN FIRST!
         setContentView(R.layout.activity_main);
 
         // Fix Double Prompt from Gatekeeper
@@ -63,7 +60,7 @@ public class MainActivity extends AppCompatActivity {
         // --- CHECK THREAT LEVEL (VOLATILE MEMORY) ---
         boolean isDuressMode = getIntent().getBooleanExtra("IS_DURESS_MODE", false);
 
-        // --- 1. LINK ALL UI ELEMENTS TO IDs ---
+        // --- 3. LINK ALL UI ELEMENTS TO IDs ---
         RecyclerView recyclerView = findViewById(R.id.recyclerView_credentials);
         FloatingActionButton fabAdd = findViewById(R.id.fab_add_password);
         searchBar = findViewById(R.id.edit_text_search);
@@ -75,13 +72,13 @@ public class MainActivity extends AppCompatActivity {
             bottomNav.getMenu().removeItem(R.id.nav_security);
         }
 
-        // --- 2. SETUP RECYCLERVIEW & ADAPTER ---
+        // --- 4. SETUP RECYCLERVIEW & ADAPTER ---
         recyclerView.setLayoutManager(new LinearLayoutManager(this));
         recyclerView.setHasFixedSize(true);
         adapter = new CredentialAdapter();
         recyclerView.setAdapter(adapter);
 
-        // --- 3. DATABASE OBSERVER ---
+        // --- 5. DATABASE OBSERVER ---
         vaultViewModel = new ViewModelProvider(this).get(VaultViewModel.class);
         vaultViewModel.getAllCredentials().observe(this, credentials -> {
             if (isDuressMode) {
@@ -95,7 +92,7 @@ public class MainActivity extends AppCompatActivity {
             }
         });
 
-        // --- 4. SEARCH BAR LOGIC ---
+        // --- 6. SEARCH BAR LOGIC ---
         searchBar.addTextChangedListener(new android.text.TextWatcher() {
             @Override
             public void beforeTextChanged(CharSequence s, int start, int count, int after) {
@@ -111,7 +108,7 @@ public class MainActivity extends AppCompatActivity {
             }
         });
 
-        // --- 5. NAV BAR LOGIC ---
+        // --- 7. NAV BAR LOGIC ---
         bottomNav.setOnItemSelectedListener(item -> {
             int itemId = item.getItemId();
 
@@ -208,14 +205,14 @@ public class MainActivity extends AppCompatActivity {
             return false;
         });
 
-        // --- 6. SET DEFAULT STATE (HOME SCREEN) ---
+        // --- 8. SET DEFAULT STATE (HOME SCREEN) ---
         recyclerView.setVisibility(View.GONE);
         fabAdd.setVisibility(View.GONE);
         searchBar.setVisibility(View.GONE);
         fragmentContainer.setVisibility(View.VISIBLE);
         getSupportFragmentManager().beginTransaction().replace(R.id.fragment_container, new HomeFragment()).commit();
 
-        // --- 7. ITEM ACTIONS (CLICK & SWIPE) ---
+        // --- 9. ITEM ACTIONS (CLICK & SWIPE) ---
         adapter.setOnItemClickListener(credential -> {
             authenticateUser(() -> {
                 try {
@@ -305,6 +302,7 @@ public class MainActivity extends AppCompatActivity {
                 }
             }
         }).attachToRecyclerView(recyclerView);
+
         // This is the ONLY click listener you should have for fabAdd
         fabAdd.setOnClickListener(v -> {
             showAddBottomSheet();

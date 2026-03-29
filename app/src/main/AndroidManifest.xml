@@ -21,7 +21,7 @@
         android:theme="@style/Theme.PassManager">
 
         <activity
-            android:name=".ui.main.WelcomeActivity"
+            android:name=".ui.main.SplashActivity"
             android:exported="true"
             android:theme="@style/Theme.PassManager">
             <intent-filter>
@@ -29,6 +29,11 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <activity
+            android:name=".ui.main.WelcomeActivity"
+            android:exported="false"
+            android:theme="@style/Theme.PassManager" />
 
         <activity
             android:name=".ui.main.MainActivity"

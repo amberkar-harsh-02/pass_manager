@@ -342,47 +342,62 @@ public class MainActivity extends AppCompatActivity {
     protected void onStart() {
         super.onStart();
         android.content.SharedPreferences prefs = getSharedPreferences("VaultSecurityPrefs", MODE_PRIVATE);
-
         long lastBackgroundTime = prefs.getLong("LAST_BACKGROUND_TIME", 0);
-        long timeoutSetting = prefs.getLong("AUTO_LOCK_TIMEOUT", 0); // Default is 0 (Immediately)
 
-        // If the user just opened the app for the first time, lastBackgroundTime is 0.
-        // We only check for a lock if they are returning from the background.
-        if (lastBackgroundTime > 0 && timeoutSetting != -1) {
+        // If resuming from the background, trigger the loading bar!
+        if (lastBackgroundTime > 0) {
+            android.widget.LinearLayout loadingOverlay = findViewById(R.id.layout_resume_loading);
+            android.widget.ProgressBar progressBar = findViewById(R.id.progress_resume);
 
-            long timeAway = System.currentTimeMillis() - lastBackgroundTime;
+            // 1. Instantly hide all UI to prevent visual leaks
+            findViewById(R.id.recyclerView_credentials).setVisibility(View.GONE);
+            findViewById(R.id.fragment_container).setVisibility(View.GONE);
+            findViewById(R.id.edit_text_search).setVisibility(View.GONE);
+            findViewById(R.id.fab_add_password).setVisibility(View.GONE);
 
-            if (timeAway >= timeoutSetting) {
-                // LOCK TRIGGERED!
-                // 1. Hide all sensitive elements immediately to prevent visual leaks
-                findViewById(R.id.recyclerView_credentials).setVisibility(View.GONE);
-                findViewById(R.id.fragment_container).setVisibility(View.GONE);
-                findViewById(R.id.edit_text_search).setVisibility(View.GONE);
-                findViewById(R.id.fab_add_password).setVisibility(View.GONE);
+            // 2. Show the loading overlay
+            loadingOverlay.setVisibility(View.VISIBLE);
 
-                // 2. Throw the Biometric Prompt
-                authenticateUser(() -> {
-                    // 3. On Success: GRACEFULLY restore visibility based on the current tab!
-                    BottomNavigationView bottomNav = findViewById(R.id.bottom_navigation);
-                    int currentTab = bottomNav.getSelectedItemId();
+            // 3. Fast 1-second progress bar animation
+            android.animation.ValueAnimator animator = android.animation.ValueAnimator.ofInt(0, 100);
+            animator.setDuration(1000); // 1 second
+            animator.addUpdateListener(animation -> progressBar.setProgress((int) animation.getAnimatedValue()));
+            animator.start();
 
-                    if (currentTab == R.id.nav_vault) {
-                        findViewById(R.id.recyclerView_credentials).setVisibility(View.VISIBLE);
-                        findViewById(R.id.edit_text_search).setVisibility(View.VISIBLE);
+            // 4. When the bar finishes, check if we need to throw the Biometric Lock
+            new android.os.Handler(android.os.Looper.getMainLooper()).postDelayed(() -> {
+                loadingOverlay.setVisibility(View.GONE);
 
-                        boolean isDuressMode = getIntent().getBooleanExtra("IS_DURESS_MODE", false);
-                        if (!isDuressMode) {
-                            findViewById(R.id.fab_add_password).setVisibility(View.VISIBLE);
-                        }
-                    } else {
-                        // For Home, 2FA, Security, and About tabs
-                        findViewById(R.id.fragment_container).setVisibility(View.VISIBLE);
-                    }
+                long timeoutSetting = prefs.getLong("AUTO_LOCK_TIMEOUT", 0);
+                long timeAway = System.currentTimeMillis() - lastBackgroundTime;
 
-                    // Reset the background timer so it doesn't instantly lock again
+                if (timeoutSetting != -1 && timeAway >= timeoutSetting) {
+                    // Lock Triggered! Throw biometric prompt before revealing UI
+                    authenticateUser(() -> {
+                        restoreUiVisibility();
+                        prefs.edit().putLong("LAST_BACKGROUND_TIME", 0).apply();
+                    });
+                } else {
+                    // No lock needed. Reveal UI safely.
+                    restoreUiVisibility();
                     prefs.edit().putLong("LAST_BACKGROUND_TIME", 0).apply();
-                });
-            }
+                }
+            }, 1000);
+        }
+    }
+
+    // Helper method to safely fade the correct tab back in
+    private void restoreUiVisibility() {
+        BottomNavigationView bottomNav = findViewById(R.id.bottom_navigation);
+        int currentTab = bottomNav.getSelectedItemId();
+
+        if (currentTab == R.id.nav_vault) {
+            findViewById(R.id.recyclerView_credentials).setVisibility(View.VISIBLE);
+            findViewById(R.id.edit_text_search).setVisibility(View.VISIBLE);
+            boolean isDuressMode = getIntent().getBooleanExtra("IS_DURESS_MODE", false);
+            if (!isDuressMode) findViewById(R.id.fab_add_password).setVisibility(View.VISIBLE);
+        } else {
+            findViewById(R.id.fragment_container).setVisibility(View.VISIBLE);
         }
     }
 

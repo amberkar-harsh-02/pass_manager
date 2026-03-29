@@ -89,4 +89,33 @@
         app:layout_constraintBottom_toTopOf="@+id/bottom_navigation"
         app:layout_constraintEnd_toEndOf="parent" />
 
+    <LinearLayout
+        android:id="@+id/layout_resume_loading"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="@color/vault_background"
+        android:gravity="center"
+        android:orientation="vertical"
+        android:translationZ="100dp"
+        android:visibility="gone">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="24dp"
+            android:fontFamily="monospace"
+            android:text="Re-establishing secure tunnel..."
+            android:textColor="@color/vault_accent"
+            android:textSize="14sp" />
+
+        <ProgressBar
+            android:id="@+id/progress_resume"
+            style="?android:attr/progressBarStyleHorizontal"
+            android:layout_width="200dp"
+            android:layout_height="wrap_content"
+            android:max="100"
+            android:progressBackgroundTint="@color/vault_surface"
+            android:progressTint="@color/vault_accent" />
+    </LinearLayout>
+
 </androidx.constraintlayout.widget.ConstraintLayout>

@@ -25,6 +25,10 @@ android {
         buildConfigField "String", "PIESOCKET_API_KEY", "\"${localProperties.getProperty('PIESOCKET_API_KEY')}\""
     }
 
+    buildFeatures {
+        buildConfig = true
+    }
+
     buildTypes {
         release {
             minifyEnabled false

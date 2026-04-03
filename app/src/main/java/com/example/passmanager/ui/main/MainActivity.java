@@ -17,6 +17,7 @@ import androidx.recyclerview.widget.ItemTouchHelper;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
+import com.example.passmanager.BuildConfig;
 import com.example.passmanager.PortraitCaptureActivity;
 import com.example.passmanager.R;
 import com.example.passmanager.SecurityUtil;
@@ -50,7 +51,6 @@ public class MainActivity extends AppCompatActivity {
         // --- 1. SECURITY: Block screenshots ---
         getWindow().setFlags(WindowManager.LayoutParams.FLAG_SECURE, WindowManager.LayoutParams.FLAG_SECURE);
 
-        // 2. PAINT THE SCREEN FIRST!
         setContentView(R.layout.activity_main);
 
         // Fix Double Prompt from Gatekeeper
@@ -67,7 +67,6 @@ public class MainActivity extends AppCompatActivity {
         FrameLayout fragmentContainer = findViewById(R.id.fragment_container);
         BottomNavigationView bottomNav = findViewById(R.id.bottom_navigation);
 
-        // THE PHANTOM TAB: Dynamically erase the Security tab from the UI if compromised
         if (isDuressMode) {
             bottomNav.getMenu().removeItem(R.id.nav_security);
         }
@@ -82,11 +81,9 @@ public class MainActivity extends AppCompatActivity {
         vaultViewModel = new ViewModelProvider(this).get(VaultViewModel.class);
         vaultViewModel.getAllCredentials().observe(this, credentials -> {
             if (isDuressMode) {
-                // THE ILLUSION: Give them a completely empty vault
                 allCredentials = new java.util.ArrayList<>();
                 adapter.setCredentials(new java.util.ArrayList<>());
             } else {
-                // REAL MODE: Load actual passwords
                 allCredentials = credentials;
                 adapter.setCredentials(credentials);
             }
@@ -95,13 +92,9 @@ public class MainActivity extends AppCompatActivity {
         // --- 6. SEARCH BAR LOGIC ---
         searchBar.addTextChangedListener(new android.text.TextWatcher() {
             @Override
-            public void beforeTextChanged(CharSequence s, int start, int count, int after) {
-            }
-
+            public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
             @Override
-            public void onTextChanged(CharSequence s, int start, int before, int count) {
-            }
-
+            public void onTextChanged(CharSequence s, int start, int before, int count) {}
             @Override
             public void afterTextChanged(android.text.Editable s) {
                 filterVault(s.toString());
@@ -112,13 +105,9 @@ public class MainActivity extends AppCompatActivity {
         bottomNav.setOnItemSelectedListener(item -> {
             int itemId = item.getItemId();
 
-            // PREVENT RE-CLICK ANIMATIONS
-            if (itemId == currentTabId) {
-                return true;
-            }
+            if (itemId == currentTabId) return true;
             currentTabId = itemId;
 
-            // Check if fragment container was hidden (used for View Animation later)
             boolean wasFragmentContainerHidden = fragmentContainer.getVisibility() == View.GONE;
 
             if (itemId == R.id.nav_home) {
@@ -126,80 +115,39 @@ public class MainActivity extends AppCompatActivity {
                 fabAdd.setVisibility(View.GONE);
                 searchBar.setVisibility(View.GONE);
                 fragmentContainer.setVisibility(View.VISIBLE);
-
-                // If coming from Vault, animate the whole container UP
-                if (wasFragmentContainerHidden) {
-                    fragmentContainer.startAnimation(AnimationUtils.loadAnimation(this, R.anim.slide_up_enter));
-                }
-
-                getSupportFragmentManager().beginTransaction()
-                        .setCustomAnimations(R.anim.slide_up_enter, R.anim.fade_out_exit)
-                        .replace(R.id.fragment_container, new HomeFragment())
-                        .commit();
+                if (wasFragmentContainerHidden) fragmentContainer.startAnimation(AnimationUtils.loadAnimation(this, R.anim.slide_up_enter));
+                getSupportFragmentManager().beginTransaction().setCustomAnimations(R.anim.slide_up_enter, R.anim.fade_out_exit).replace(R.id.fragment_container, new HomeFragment()).commit();
                 return true;
-
             } else if (itemId == R.id.nav_vault) {
                 fragmentContainer.setVisibility(View.GONE);
                 recyclerView.setVisibility(View.VISIBLE);
                 searchBar.setVisibility(View.VISIBLE);
-
-                // ANIMATE THE VAULT RECYCLER VIEW MANUALLY UP
                 recyclerView.startAnimation(AnimationUtils.loadAnimation(this, R.anim.slide_up_enter));
-
-                // Only show the Add button if we are NOT in Duress Mode
-                if (!isDuressMode) {
-                    fabAdd.setVisibility(View.VISIBLE);
-                } else {
-                    fabAdd.setVisibility(View.GONE);
-                }
+                fabAdd.setVisibility(isDuressMode ? View.GONE : View.VISIBLE);
                 return true;
-
             } else if (itemId == R.id.nav_authenticator) {
                 recyclerView.setVisibility(View.GONE);
                 fabAdd.setVisibility(View.GONE);
                 searchBar.setVisibility(View.GONE);
                 fragmentContainer.setVisibility(View.VISIBLE);
-
-                if (wasFragmentContainerHidden) {
-                    fragmentContainer.startAnimation(AnimationUtils.loadAnimation(this, R.anim.slide_up_enter));
-                }
-
-                getSupportFragmentManager().beginTransaction()
-                        .setCustomAnimations(R.anim.slide_up_enter, R.anim.fade_out_exit)
-                        .replace(R.id.fragment_container, new AuthenticatorFragment())
-                        .commit();
+                if (wasFragmentContainerHidden) fragmentContainer.startAnimation(AnimationUtils.loadAnimation(this, R.anim.slide_up_enter));
+                getSupportFragmentManager().beginTransaction().setCustomAnimations(R.anim.slide_up_enter, R.anim.fade_out_exit).replace(R.id.fragment_container, new AuthenticatorFragment()).commit();
                 return true;
-
             } else if (itemId == R.id.nav_security) {
                 recyclerView.setVisibility(View.GONE);
                 fabAdd.setVisibility(View.GONE);
                 searchBar.setVisibility(View.GONE);
                 fragmentContainer.setVisibility(View.VISIBLE);
-
-                if (wasFragmentContainerHidden) {
-                    fragmentContainer.startAnimation(AnimationUtils.loadAnimation(this, R.anim.slide_up_enter));
-                }
-
-                getSupportFragmentManager().beginTransaction()
-                        .setCustomAnimations(R.anim.slide_up_enter, R.anim.fade_out_exit)
-                        .replace(R.id.fragment_container, new SecurityFragment())
-                        .commit();
+                if (wasFragmentContainerHidden) fragmentContainer.startAnimation(AnimationUtils.loadAnimation(this, R.anim.slide_up_enter));
+                getSupportFragmentManager().beginTransaction().setCustomAnimations(R.anim.slide_up_enter, R.anim.fade_out_exit).replace(R.id.fragment_container, new SecurityFragment()).commit();
                 return true;
-
             } else if (itemId == R.id.nav_about) {
                 recyclerView.setVisibility(View.GONE);
                 fabAdd.setVisibility(View.GONE);
                 searchBar.setVisibility(View.GONE);
                 fragmentContainer.setVisibility(View.VISIBLE);
-
-                if (wasFragmentContainerHidden) {
-                    fragmentContainer.startAnimation(AnimationUtils.loadAnimation(this, R.anim.slide_up_enter));
-                }
-
-                getSupportFragmentManager().beginTransaction()
-                        .setCustomAnimations(R.anim.slide_up_enter, R.anim.fade_out_exit)
-                        .replace(R.id.fragment_container, new AboutFragment()) // Loads the new page
-                        .commit();
+                if (wasFragmentContainerHidden) fragmentContainer.startAnimation(AnimationUtils.loadAnimation(this, R.anim.slide_up_enter));
+                getSupportFragmentManager().beginTransaction().setCustomAnimations(R.anim.slide_up_enter, R.anim.fade_out_exit).replace(R.id.fragment_container, new AboutFragment()).commit();
                 return true;
             }
             return false;
@@ -229,22 +177,17 @@ public class MainActivity extends AppCompatActivity {
                             })
                             // --- QR CODE BRIDGE BUTTON ---
                             .setNegativeButton("Scan to Fill", (dialog, which) -> {
-                                // 1. Save the decrypted password to RAM
                                 pendingInjectionPayload = decryptedPassword;
                                 pendingUsernamePayload = credential.getUsername();
 
-                                // 2. Configure the Viewfinder
                                 com.journeyapps.barcodescanner.ScanOptions options = new com.journeyapps.barcodescanner.ScanOptions();
                                 options.setDesiredBarcodeFormats(com.journeyapps.barcodescanner.ScanOptions.QR_CODE);
                                 options.setPrompt("Scan the Ledger Extension QR Code");
                                 options.setCameraId(0);
                                 options.setBeepEnabled(false);
-
-                                // --- FORCE PORTRAIT MODE ---
                                 options.setCaptureActivity(PortraitCaptureActivity.class);
                                 options.setOrientationLocked(true);
 
-                                // 3. Launch the Camera
                                 barcodeLauncher.launch(options);
                             }).show();
 
@@ -264,12 +207,9 @@ public class MainActivity extends AppCompatActivity {
             public void onSwiped(@NonNull RecyclerView.ViewHolder viewHolder, int direction) {
                 int position = viewHolder.getAdapterPosition();
                 com.example.passmanager.data.model.Credential targetCredential = adapter.getCredentialAt(position);
-
-                // Instantly bounce the item back into the list while we process the action
                 adapter.notifyItemChanged(position);
 
                 if (direction == ItemTouchHelper.RIGHT) {
-                    // --- SWIPE RIGHT: DELETE ---
                     authenticateUser(() -> {
                         new MaterialAlertDialogBuilder(MainActivity.this)
                                 .setTitle("Delete Password?")
@@ -281,32 +221,22 @@ public class MainActivity extends AppCompatActivity {
                                 .setNegativeButton("Cancel", (dialog, which) -> dialog.dismiss())
                                 .show();
                     });
-
                 } else if (direction == ItemTouchHelper.LEFT) {
-                    // --- SWIPE LEFT: EDIT ---
                     authenticateUser(() -> {
                         android.content.Intent intent = new android.content.Intent(MainActivity.this, EditCredentialActivity.class);
-
-                        // Package up the old data to send to the Edit Screen
                         intent.putExtra("CREDENTIAL_ID", targetCredential.getId());
                         intent.putExtra("CREDENTIAL_TITLE", targetCredential.getTitle());
                         intent.putExtra("CREDENTIAL_USERNAME", targetCredential.getUsername());
                         intent.putExtra("CREDENTIAL_ENCRYPTED_PW", targetCredential.getEncryptedPassword());
                         intent.putExtra("CREDENTIAL_IV", targetCredential.getEncryptionIv());
-
-                        // Pass the TOTP Secret so it doesn't get wiped!
                         intent.putExtra("CREDENTIAL_TOTP_SECRET", targetCredential.getTotpSecret());
-
                         startActivity(intent);
                     });
                 }
             }
         }).attachToRecyclerView(recyclerView);
 
-        // This is the ONLY click listener you should have for fabAdd
-        fabAdd.setOnClickListener(v -> {
-            showAddBottomSheet();
-        });
+        fabAdd.setOnClickListener(v -> showAddBottomSheet());
     }
 
     private void filterVault(String text) {
@@ -344,41 +274,33 @@ public class MainActivity extends AppCompatActivity {
         android.content.SharedPreferences prefs = getSharedPreferences("VaultSecurityPrefs", MODE_PRIVATE);
         long lastBackgroundTime = prefs.getLong("LAST_BACKGROUND_TIME", 0);
 
-        // If resuming from the background, trigger the loading bar!
         if (lastBackgroundTime > 0) {
             android.widget.LinearLayout loadingOverlay = findViewById(R.id.layout_resume_loading);
             android.widget.ProgressBar progressBar = findViewById(R.id.progress_resume);
 
-            // 1. Instantly hide all UI to prevent visual leaks
             findViewById(R.id.recyclerView_credentials).setVisibility(View.GONE);
             findViewById(R.id.fragment_container).setVisibility(View.GONE);
             findViewById(R.id.edit_text_search).setVisibility(View.GONE);
             findViewById(R.id.fab_add_password).setVisibility(View.GONE);
 
-            // 2. Show the loading overlay
             loadingOverlay.setVisibility(View.VISIBLE);
 
-            // 3. Fast 1-second progress bar animation
             android.animation.ValueAnimator animator = android.animation.ValueAnimator.ofInt(0, 100);
-            animator.setDuration(1000); // 1 second
+            animator.setDuration(1000);
             animator.addUpdateListener(animation -> progressBar.setProgress((int) animation.getAnimatedValue()));
             animator.start();
 
-            // 4. When the bar finishes, check if we need to throw the Biometric Lock
             new android.os.Handler(android.os.Looper.getMainLooper()).postDelayed(() -> {
                 loadingOverlay.setVisibility(View.GONE);
-
                 long timeoutSetting = prefs.getLong("AUTO_LOCK_TIMEOUT", 0);
                 long timeAway = System.currentTimeMillis() - lastBackgroundTime;
 
                 if (timeoutSetting != -1 && timeAway >= timeoutSetting) {
-                    // Lock Triggered! Throw biometric prompt before revealing UI
                     authenticateUser(() -> {
                         restoreUiVisibility();
                         prefs.edit().putLong("LAST_BACKGROUND_TIME", 0).apply();
                     });
                 } else {
-                    // No lock needed. Reveal UI safely.
                     restoreUiVisibility();
                     prefs.edit().putLong("LAST_BACKGROUND_TIME", 0).apply();
                 }
@@ -386,7 +308,6 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-    // Helper method to safely fade the correct tab back in
     private void restoreUiVisibility() {
         BottomNavigationView bottomNav = findViewById(R.id.bottom_navigation);
         int currentTab = bottomNav.getSelectedItemId();
@@ -404,11 +325,32 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onStop() {
         super.onStop();
-        // The moment the app goes to the background, stamp the current time
         android.content.SharedPreferences prefs = getSharedPreferences("VaultSecurityPrefs", MODE_PRIVATE);
         prefs.edit().putLong("LAST_BACKGROUND_TIME", System.currentTimeMillis()).apply();
     }
 
+    // --- OPTICAL KEY ENCRYPTION ENGINE (E2EE) ---
+    private android.util.Pair<String, String> encryptForTransmission(String plaintext, String base64Key) throws Exception {
+        // 1. Decode the AES key pulled from the optical QR code
+        byte[] decodedKey = android.util.Base64.decode(base64Key, android.util.Base64.DEFAULT);
+        javax.crypto.SecretKey originalKey = new javax.crypto.spec.SecretKeySpec(decodedKey, 0, decodedKey.length, "AES");
+
+        // 2. Generate an ephemeral 12-byte IV for this specific transmission
+        byte[] iv = new byte[12];
+        new java.security.SecureRandom().nextBytes(iv);
+        javax.crypto.spec.GCMParameterSpec parameterSpec = new javax.crypto.spec.GCMParameterSpec(128, iv);
+
+        // 3. Encrypt the payload using AES-256-GCM
+        javax.crypto.Cipher cipher = javax.crypto.Cipher.getInstance("AES/GCM/NoPadding");
+        cipher.init(javax.crypto.Cipher.ENCRYPT_MODE, originalKey, parameterSpec);
+        byte[] cipherText = cipher.doFinal(plaintext.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+
+        // 4. Encode the IV and Ciphertext for safe network transit
+        String base64Iv = android.util.Base64.encodeToString(iv, android.util.Base64.NO_WRAP);
+        String base64Cipher = android.util.Base64.encodeToString(cipherText, android.util.Base64.NO_WRAP);
+
+        return new android.util.Pair<>(base64Iv, base64Cipher);
+    }
 
     // --- THE CAMERA SCANNER & NETWORK BRIDGE ---
     private final androidx.activity.result.ActivityResultLauncher<com.journeyapps.barcodescanner.ScanOptions> barcodeLauncher =
@@ -420,71 +362,68 @@ public class MainActivity extends AppCompatActivity {
                     pendingUsernamePayload = null;
                     pendingTitlePayload = null;
                 } else {
-                    // --- CAPTURE AND WIPE SYNCHRONOUSLY ---
                     final String capturedPass = pendingInjectionPayload;
                     final String capturedUser = pendingUsernamePayload;
-                    final String capturedTitle = pendingTitlePayload; // Grab the title!
+                    final String capturedTitle = pendingTitlePayload;
 
                     pendingInjectionPayload = null;
                     pendingUsernamePayload = null;
                     pendingTitlePayload = null;
 
                     if (capturedPass == null || capturedUser == null) {
-                        // This means it was a normal "Scan to Fill" and we don't need to save a new credential
+                        // Scan without pending payload
                     } else if (capturedTitle != null) {
-                        // --- THE BACKGROUND SAVE (MVVM ALIGNED) ---
                         try {
-                            // 1. Encrypt the raw password using your EncryptionUtil
                             android.util.Pair<String, String> encryptedData =
                                     com.example.passmanager.security.EncryptionUtil.encryptPassword(capturedPass);
 
-                            String cipherText = encryptedData.first; // The Base64 CipherText
-                            String iv = encryptedData.second;        // The Base64 IV
-
-                            // 2. Build the Credential Entity (HealthScore hardcoded to 3 for generated strings)
                             com.example.passmanager.data.model.Credential newAccount =
-                                    new com.example.passmanager.data.model.Credential(capturedTitle, capturedUser, cipherText, iv, 3, null);
+                                    new com.example.passmanager.data.model.Credential(capturedTitle, capturedUser, encryptedData.first, encryptedData.second, 3, null);
 
-                            // 3. Connect to your existing ViewModel
                             com.example.passmanager.ui.viewmodel.VaultViewModel vaultViewModel =
                                     new androidx.lifecycle.ViewModelProvider(MainActivity.this).get(com.example.passmanager.ui.viewmodel.VaultViewModel.class);
 
-                            // 4. Insert it
                             vaultViewModel.insert(newAccount);
-
                             android.widget.Toast.makeText(MainActivity.this, "Saved " + capturedTitle + " to Vault!", android.widget.Toast.LENGTH_SHORT).show();
-
                         } catch (Exception e) {
-                            android.util.Log.e("LedgerVault", "Failed to encrypt/save to Room DB: ", e);
                             android.widget.Toast.makeText(MainActivity.this, "Encryption Error!", android.widget.Toast.LENGTH_SHORT).show();
                         }
                     }
 
                     try {
-                        // 1. Parse the QR Code JSON
+                        // 1. Parse the NEW armored QR Code JSON
                         org.json.JSONObject qrData = new org.json.JSONObject(result.getContents());
                         String targetRoom = qrData.getString("room");
+                        String opticalKey = qrData.getString("key"); // Grabbing the air-gapped key!
 
-                        // 2. Connect to your Private Pub/Sub Relay (Ensure your PieSocket URL is here!)
-                        String RELAY_URL = "wss://s16353.nyc1.piesocket.com/v3/1?api_key=GK8axGZJUQtEZarRXFD2Q22Qyk4ypJEJk2QHrBbp&notify_self=1";
+                        // 2. Encrypt the password using the Optical Key
+                        android.util.Pair<String, String> encryptedTransmission = encryptForTransmission(capturedPass, opticalKey);
+                        String transmissionIv = encryptedTransmission.first;
+                        String transmissionPayload = encryptedTransmission.second;
+
+                        // 3. Connect using hidden key
+                        String RELAY_URL = "wss://s16353.nyc1.piesocket.com/v3/1?api_key=" + BuildConfig.PIESOCKET_API_KEY + "&notify_self=1";
                         okhttp3.OkHttpClient client = new okhttp3.OkHttpClient();
                         okhttp3.Request request = new okhttp3.Request.Builder().url(RELAY_URL).build();
 
-                        android.widget.Toast.makeText(this, "Firing Payload...", android.widget.Toast.LENGTH_SHORT).show();
+                        android.widget.Toast.makeText(this, "Firing Ciphertext...", android.widget.Toast.LENGTH_SHORT).show();
 
-                        // 3. Fire the payload over WebSockets
+                        // 4. Fire the BLIND payload over WebSockets
                         client.newWebSocket(request, new okhttp3.WebSocketListener() {
                             @Override
                             public void onOpen(okhttp3.WebSocket webSocket, okhttp3.Response response) {
                                 try {
                                     org.json.JSONObject payloadWrapper = new org.json.JSONObject();
                                     payloadWrapper.put("room", targetRoom);
-                                    payloadWrapper.put("username", capturedUser); // Add Username
-                                    payloadWrapper.put("password", capturedPass); // Add Password
+                                    payloadWrapper.put("username", capturedUser);
+
+                                    // SENDING ONLY GIBBERISH TO PIESOCKET
+                                    payloadWrapper.put("payload", transmissionPayload);
+                                    payloadWrapper.put("iv", transmissionIv);
 
                                     webSocket.send(payloadWrapper.toString());
 
-                                    runOnUiThread(() -> android.widget.Toast.makeText(MainActivity.this, "Payload Delivered to Relay!", android.widget.Toast.LENGTH_SHORT).show());
+                                    runOnUiThread(() -> android.widget.Toast.makeText(MainActivity.this, "Ciphertext Delivered to Relay!", android.widget.Toast.LENGTH_SHORT).show());
                                 } catch (Exception e) {
                                     e.printStackTrace();
                                 }
@@ -492,39 +431,28 @@ public class MainActivity extends AppCompatActivity {
 
                             @Override
                             public void onFailure(okhttp3.WebSocket webSocket, Throwable t, okhttp3.Response response) {
-                                if (t instanceof java.io.EOFException) {
-                                    android.util.Log.w("LedgerBridge", "Server closed connection early, but payload may have fired.");
-                                } else {
-                                    android.util.Log.e("LedgerBridge", "FATAL NETWORK CRASH: ", t);
-                                    runOnUiThread(() -> android.widget.Toast.makeText(MainActivity.this, "Network Bridge Failed.", android.widget.Toast.LENGTH_SHORT).show());
-                                }
+                                runOnUiThread(() -> android.widget.Toast.makeText(MainActivity.this, "Network Bridge Failed.", android.widget.Toast.LENGTH_SHORT).show());
                             }
                         });
 
                     } catch (Exception e) {
-                        // Print the EXACT reason it failed to your Logcat
-                        android.util.Log.e("LedgerBridge", "Setup Failed: ", e);
+                        android.util.Log.e("LedgerBridge", "E2EE Setup Failed: ", e);
                         android.widget.Toast.makeText(this, "Error: " + e.getMessage(), android.widget.Toast.LENGTH_LONG).show();
                     }
                 }
             });
 
-    // --- THE SIGN-UP INJECTOR LOGIC ---
     private void showSignUpInjectorDialog() {
-        // Create a layout to stack our two input fields
         android.widget.LinearLayout layout = new android.widget.LinearLayout(this);
         layout.setOrientation(android.widget.LinearLayout.VERTICAL);
         layout.setPadding(50, 40, 50, 10);
 
-        // 1. Title Input (e.g., "GitHub")
         android.widget.EditText titleInput = new android.widget.EditText(this);
         titleInput.setHint("Website/App Name (e.g., GitHub)");
         layout.addView(titleInput);
 
-        // 2. Username Input
         android.widget.EditText usernameInput = new android.widget.EditText(this);
         usernameInput.setHint("Username / Email");
-        // Add a little margin between the boxes
         android.widget.LinearLayout.LayoutParams params = new android.widget.LinearLayout.LayoutParams(
                 android.view.ViewGroup.LayoutParams.MATCH_PARENT, android.view.ViewGroup.LayoutParams.WRAP_CONTENT);
         params.setMargins(0, 20, 0, 0);
@@ -544,15 +472,12 @@ public class MainActivity extends AppCompatActivity {
                         return;
                     }
 
-                    // 1. Generate the payload
                     String newPass = SecurityUtil.generateSecurePassword();
 
-                    // 2. Load the chamber with ALL THREE pieces of data
                     pendingTitlePayload = newTitle;
                     pendingUsernamePayload = newUser;
                     pendingInjectionPayload = newPass;
 
-                    // 3. Launch the Scanner
                     com.journeyapps.barcodescanner.ScanOptions options = new com.journeyapps.barcodescanner.ScanOptions();
                     options.setDesiredBarcodeFormats(com.journeyapps.barcodescanner.ScanOptions.QR_CODE);
                     options.setPrompt("Scan Extension QR to Inject New Account");
@@ -570,25 +495,19 @@ public class MainActivity extends AppCompatActivity {
     private void showAddBottomSheet() {
         com.google.android.material.bottomsheet.BottomSheetDialog bottomSheetDialog =
                 new com.google.android.material.bottomsheet.BottomSheetDialog(this);
-
         android.view.View sheetView = getLayoutInflater().inflate(R.layout.bottom_sheet_add, null);
         bottomSheetDialog.setContentView(sheetView);
 
-        // 1. Bind the two new rows
         android.widget.LinearLayout btnManual = sheetView.findViewById(R.id.btn_manual_entry);
         android.widget.LinearLayout btnGenerate = sheetView.findViewById(R.id.btn_generate_inject);
 
-        // 2. Wire up the Manual Entry click
         btnManual.setOnClickListener(v -> {
             bottomSheetDialog.dismiss();
-            // Start your standard Add Activity
             startActivity(new android.content.Intent(MainActivity.this, com.example.passmanager.ui.main.AddCredentialActivity.class));
         });
 
-        // 3. Wire up the Generator click
         btnGenerate.setOnClickListener(v -> {
             bottomSheetDialog.dismiss();
-            // Trigger the generator dialog we built earlier!
             showSignUpInjectorDialog();
         });
 

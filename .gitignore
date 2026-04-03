@@ -13,3 +13,4 @@
 .externalNativeBuild
 .cxx
 local.properties
+/Extension-pass/config.js

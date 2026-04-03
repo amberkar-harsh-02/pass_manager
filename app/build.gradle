@@ -4,6 +4,11 @@ plugins {
     id 'com.google.firebase.appdistribution'
 }
 
+def localProperties = new Properties()
+if (rootProject.file("local.properties").exists()) {
+    localProperties.load(rootProject.file("local.properties").newDataInputStream())
+}
+
 android {
     namespace 'com.example.passmanager'
     compileSdk 36
@@ -16,6 +21,8 @@ android {
         versionName "1.1.0"
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
+
+        buildConfigField "String", "PIESOCKET_API_KEY", "\"${localProperties.getProperty('PIESOCKET_API_KEY')}\""
     }
 
     buildTypes {

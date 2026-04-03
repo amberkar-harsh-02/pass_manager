@@ -1,6 +1,6 @@
 // The Pub/Sub Relay Server
 // PieSocket's Official Demo Cluster
-const RELAY_URL = "wss://s16353.nyc1.piesocket.com/v3/1?api_key=GK8axGZJUQtEZarRXFD2Q22Qyk4ypJEJk2QHrBbp&notify_self=1"
+const RELAY_URL = `wss://s16353.nyc1.piesocket.com/v3/1?api_key=${LEDGER_CONFIG.PIESOCKET_API_KEY}&notify_self=1`;
 const roomId = Math.random().toString(36).substring(2, 8).toUpperCase();
 const sessionKey = Math.random().toString(36).substring(2, 10);
 

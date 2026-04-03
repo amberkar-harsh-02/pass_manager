@@ -16,5 +16,8 @@
   "action": {
     "default_popup": "popup.html",
     "default_title": "Open Ledger Bridge"
+  },
+  "background": {
+    "scripts": ["config.js", "popup.js"]
   }
 }

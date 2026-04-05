@@ -106,32 +106,81 @@ socket.onmessage = async function(event) {
 // --- 4. THE PROXIMITY HEURISTIC (Unchanged) ---
 
 function injectCredentials(username, password) {
-    const inputs = Array.from(document.querySelectorAll('input'));
-    const passFields = inputs.filter(input => input.type.toLowerCase() === 'password');
+    console.log("Ledger: Commencing payload injection sequence...");
 
-    if (passFields.length > 0) {
-        passFields.forEach(field => {
-            field.value = password;
-            field.dispatchEvent(new Event('input', { bubbles: true }));
-            field.dispatchEvent(new Event('change', { bubbles: true }));
-        });
+    // Helper function to handle the actual injection logic
+    function firePayload() {
+        const inputs = Array.from(document.querySelectorAll('input'));
+        const passFields = inputs.filter(input => input.type.toLowerCase() === 'password');
 
-        const firstPassIndex = inputs.indexOf(passFields[0]);
+        if (passFields.length > 0) {
+            // 1. Inject Password(s)
+            passFields.forEach(field => {
+                field.value = password;
+                field.dispatchEvent(new Event('input', { bubbles: true }));
+                field.dispatchEvent(new Event('change', { bubbles: true }));
+            });
 
-        for (let i = firstPassIndex - 1; i >= 0; i--) {
-            const type = inputs[i].type.toLowerCase();
-            const isVisible = inputs[i].style.display !== 'none' && inputs[i].type !== 'hidden';
+            // 2. Walk backwards to find the Username field
+            const firstPassIndex = inputs.indexOf(passFields[0]);
+            for (let i = firstPassIndex - 1; i >= 0; i--) {
+                const type = inputs[i].type.toLowerCase();
+                const isVisible = inputs[i].style.display !== 'none' && inputs[i].type !== 'hidden';
 
-            if ((type === 'text' || type === 'email') && isVisible) {
-                const userField = inputs[i];
-                userField.value = username;
-                userField.dispatchEvent(new Event('input', { bubbles: true }));
-                userField.dispatchEvent(new Event('change', { bubbles: true }));
-                break;
+                if ((type === 'text' || type === 'email') && isVisible) {
+                    const userField = inputs[i];
+                    userField.value = username;
+                    userField.dispatchEvent(new Event('input', { bubbles: true }));
+                    userField.dispatchEvent(new Event('change', { bubbles: true }));
+                    break;
+                }
             }
+            return true; // Payload successfully delivered
         }
-        alert("New Account Credentials Injected!");
-    } else {
-        alert("Error: No password fields found on this registration page.");
+        return false; // Target not found yet
     }
+
+    // --- PHASE 1: Immediate Strike ---
+    if (firePayload()) {
+        alert("Ledger: Target Credentials Injected!");
+        return;
+    }
+
+    // --- PHASE 2: The Tripwire (Phantom Field Hunt) ---
+    console.warn("Ledger: Password field missing. Deploying DOM Tripwire...");
+
+    // Try to inject the username immediately so the user can hit "Next"
+    const allInputs = Array.from(document.querySelectorAll('input'));
+    const possibleUserFields = allInputs.filter(input =>
+        (input.type.toLowerCase() === 'text' || input.type.toLowerCase() === 'email') &&
+        input.style.display !== 'none' && input.type !== 'hidden'
+    );
+
+    if (possibleUserFields.length > 0) {
+        const userField = possibleUserFields[0]; // Guess the first visible text box
+        userField.value = username;
+        userField.dispatchEvent(new Event('input', { bubbles: true }));
+        userField.dispatchEvent(new Event('change', { bubbles: true }));
+    }
+
+    // Plant the MutationObserver
+    const observer = new MutationObserver((mutations, obs) => {
+        // Every time the webpage mutates, check if our target appeared
+        const passCheck = document.querySelectorAll('input[type="password"]');
+        if (passCheck.length > 0) {
+            console.log("Ledger: Tripwire Snapped! Phantom field detected.");
+            obs.disconnect(); // Stop watching the DOM to save memory
+            firePayload();    // Inject the password
+        }
+    });
+
+    // Arm the observer to watch the entire body for structural changes
+    observer.observe(document.body, { childList: true, subtree: true });
+
+    // Phase 3: The Kill Switch
+    // If the user isn't actually logging in, we don't want this running forever.
+    setTimeout(() => {
+        observer.disconnect();
+        console.log("Ledger: Tripwire timed out after 15 seconds.");
+    }, 15000);
 }

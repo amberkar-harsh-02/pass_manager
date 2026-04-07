@@ -1,19 +1,15 @@
 // --- 1. CRYPTOGRAPHY ENGINE ---
 
-// Generate a secure, random 256-bit (32 byte) AES key
 function generateEphemeralKey() {
     const keyArray = new Uint8Array(32);
     window.crypto.getRandomValues(keyArray);
-    // Convert the raw bytes into a Base64 string so it fits nicely in a QR code
     return btoa(String.fromCharCode.apply(null, keyArray));
 }
 
-// Generate a random 6-character Room ID
 function generateRoomId() {
     return Math.random().toString(36).substring(2, 8).toUpperCase();
 }
 
-// The native Web Crypto engine to decrypt the Android payload
 async function decryptPayload(base64Ciphertext, base64Iv, base64Key) {
     try {
         const keyBuffer = Uint8Array.from(atob(base64Key), c => c.charCodeAt(0));
@@ -38,11 +34,8 @@ async function decryptPayload(base64Ciphertext, base64Iv, base64Key) {
 
 // --- 2. EXTENSION INITIALIZATION ---
 
-// Lock in the session variables instantly
 const roomId = generateRoomId();
 const sessionKey = generateEphemeralKey();
-
-// Ensure LEDGER_CONFIG is loaded before this script runs!
 const RELAY_URL = `wss://s16353.nyc1.piesocket.com/v3/1?api_key=${LEDGER_CONFIG.PIESOCKET_API_KEY}&notify_self=1`;
 
 const statusText = document.getElementById('status-text');
@@ -59,7 +52,6 @@ socket.onopen = function() {
     statusText.innerText = "Awaiting Encrypted Payload...";
     statusText.className = "status-badge waiting";
 
-    // Embed BOTH the Room ID and the AES Key into the QR code
     const qrData = JSON.stringify({ room: roomId, key: sessionKey });
     qrImage.src = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(qrData)}`;
     qrImage.style.display = "inline";
@@ -72,24 +64,36 @@ socket.onmessage = async function(event) {
     try {
         const incomingData = JSON.parse(event.data);
 
-        // We now expect { room, username, payload (ciphertext), iv }
         if (incomingData.room === roomId && incomingData.payload && incomingData.iv) {
 
             statusText.innerText = "Decrypting Payload...";
             statusText.className = "status-badge waiting";
 
-            // Feed the ciphertext and IV into the decryption engine using our optical key
-            const decryptedPassword = await decryptPayload(incomingData.payload, incomingData.iv, sessionKey);
+            const decryptedString = await decryptPayload(incomingData.payload, incomingData.iv, sessionKey);
 
-            if (decryptedPassword) {
+            if (decryptedString) {
                 statusText.innerText = "Target Injected!";
                 statusText.className = "status-badge success";
+
+                let parsedPassword = "";
+                let parsedTotp = null;
+
+                // Detect if the payload is the new JSON bundle or the old plaintext string
+                try {
+                    const secureBundle = JSON.parse(decryptedString);
+                    parsedPassword = secureBundle.password;
+                    parsedTotp = secureBundle.totp || null;
+                } catch (e) {
+                    // Fallback just in case you test with the old Android app version
+                    parsedPassword = decryptedString;
+                }
 
                 chrome.tabs.query({active: true, currentWindow: true}, function(tabs) {
                     chrome.scripting.executeScript({
                         target: {tabId: tabs[0].id},
                         func: injectCredentials,
-                        args: [incomingData.username, decryptedPassword]
+                        // Pass the 2FA code as a 3rd argument!
+                        args: [incomingData.username, parsedPassword, parsedTotp]
                     });
                 });
             } else {
@@ -103,25 +107,22 @@ socket.onmessage = async function(event) {
 };
 
 
-// --- 4. THE PROXIMITY HEURISTIC (Unchanged) ---
+// --- 4. THE PROXIMITY HEURISTIC & 2FA TRIPWIRE ---
 
-function injectCredentials(username, password) {
+function injectCredentials(username, password, totpCode) {
     console.log("Ledger: Commencing payload injection sequence...");
 
-    // Helper function to handle the actual injection logic
-    function firePayload() {
+    function firePasswordPayload() {
         const inputs = Array.from(document.querySelectorAll('input'));
         const passFields = inputs.filter(input => input.type.toLowerCase() === 'password');
 
         if (passFields.length > 0) {
-            // 1. Inject Password(s)
             passFields.forEach(field => {
                 field.value = password;
                 field.dispatchEvent(new Event('input', { bubbles: true }));
                 field.dispatchEvent(new Event('change', { bubbles: true }));
             });
 
-            // 2. Walk backwards to find the Username field
             const firstPassIndex = inputs.indexOf(passFields[0]);
             for (let i = firstPassIndex - 1; i >= 0; i--) {
                 const type = inputs[i].type.toLowerCase();
@@ -135,21 +136,65 @@ function injectCredentials(username, password) {
                     break;
                 }
             }
-            return true; // Payload successfully delivered
+            return true;
         }
-        return false; // Target not found yet
+        return false;
+    }
+
+    // --- PHASE 3: The TOTP 2FA Tripwire ---
+    function deployTotpTripwire() {
+        if (!totpCode) return;
+        console.warn("Ledger: 2FA Token loaded. Deploying TOTP Tripwire...");
+
+        function tryInjectTotp() {
+            const inputs = Array.from(document.querySelectorAll('input'));
+            // Look for common 2FA field heuristics
+            const totpField = inputs.find(input =>
+                input.autocomplete === 'one-time-code' ||
+                input.name.toLowerCase().includes('totp') ||
+                input.name.toLowerCase().includes('code') ||
+                input.id.toLowerCase().includes('totp') ||
+                (input.type === 'text' && input.maxLength === 6)
+            );
+
+            if (totpField && totpField.style.display !== 'none') {
+                totpField.value = totpCode;
+                totpField.dispatchEvent(new Event('input', { bubbles: true }));
+                totpField.dispatchEvent(new Event('change', { bubbles: true }));
+                console.log("Ledger: TOTP Code Injected!");
+                return true;
+            }
+            return false;
+        }
+
+        if (tryInjectTotp()) return;
+
+        // If 2FA box isn't visible yet, wait for it (often loads on next screen)
+        const totpObserver = new MutationObserver((mutations, obs) => {
+            if (tryInjectTotp()) {
+                obs.disconnect();
+            }
+        });
+
+        totpObserver.observe(document.body, { childList: true, subtree: true });
+
+        // Give the user 60 seconds to reach the 2FA screen before killing the watcher
+        setTimeout(() => {
+            totpObserver.disconnect();
+            console.log("Ledger: TOTP Tripwire timed out.");
+        }, 60000);
     }
 
     // --- PHASE 1: Immediate Strike ---
-    if (firePayload()) {
-        alert("Ledger: Target Credentials Injected!");
+    if (firePasswordPayload()) {
+        console.log("Ledger: Target Credentials Injected!");
+        deployTotpTripwire(); // Deploy 2FA watcher immediately after password fills
         return;
     }
 
-    // --- PHASE 2: The Tripwire (Phantom Field Hunt) ---
+    // --- PHASE 2: The Phantom Field Hunt ---
     console.warn("Ledger: Password field missing. Deploying DOM Tripwire...");
 
-    // Try to inject the username immediately so the user can hit "Next"
     const allInputs = Array.from(document.querySelectorAll('input'));
     const possibleUserFields = allInputs.filter(input =>
         (input.type.toLowerCase() === 'text' || input.type.toLowerCase() === 'email') &&
@@ -157,28 +202,24 @@ function injectCredentials(username, password) {
     );
 
     if (possibleUserFields.length > 0) {
-        const userField = possibleUserFields[0]; // Guess the first visible text box
+        const userField = possibleUserFields[0];
         userField.value = username;
         userField.dispatchEvent(new Event('input', { bubbles: true }));
         userField.dispatchEvent(new Event('change', { bubbles: true }));
     }
 
-    // Plant the MutationObserver
     const observer = new MutationObserver((mutations, obs) => {
-        // Every time the webpage mutates, check if our target appeared
         const passCheck = document.querySelectorAll('input[type="password"]');
         if (passCheck.length > 0) {
             console.log("Ledger: Tripwire Snapped! Phantom field detected.");
-            obs.disconnect(); // Stop watching the DOM to save memory
-            firePayload();    // Inject the password
+            obs.disconnect();
+            firePasswordPayload();
+            deployTotpTripwire(); // Deploy 2FA watcher once password fills
         }
     });
 
-    // Arm the observer to watch the entire body for structural changes
     observer.observe(document.body, { childList: true, subtree: true });
 
-    // Phase 3: The Kill Switch
-    // If the user isn't actually logging in, we don't want this running forever.
     setTimeout(() => {
         observer.disconnect();
         console.log("Ledger: Tripwire timed out after 15 seconds.");

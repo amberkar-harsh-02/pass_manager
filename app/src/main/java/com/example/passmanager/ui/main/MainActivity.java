@@ -41,6 +41,8 @@ public class MainActivity extends AppCompatActivity {
     private String pendingUsernamePayload = null;
     private String pendingTitlePayload = null;
 
+    private String pendingTotpSecretPayload = null;
+
     // Tracks the currently active tab to prevent re-click animations
     private int currentTabId = R.id.nav_home;
 
@@ -179,6 +181,9 @@ public class MainActivity extends AppCompatActivity {
                             .setNegativeButton("Scan to Fill", (dialog, which) -> {
                                 pendingInjectionPayload = decryptedPassword;
                                 pendingUsernamePayload = credential.getUsername();
+                                pendingTotpSecretPayload = credential.getTotpSecret();
+                                pendingTotpSecretPayload = credential.getTotpSecret();
+
 
                                 com.journeyapps.barcodescanner.ScanOptions options = new com.journeyapps.barcodescanner.ScanOptions();
                                 options.setDesiredBarcodeFormats(com.journeyapps.barcodescanner.ScanOptions.QR_CODE);
@@ -394,19 +399,33 @@ public class MainActivity extends AppCompatActivity {
                         // 1. Parse the NEW armored QR Code JSON
                         org.json.JSONObject qrData = new org.json.JSONObject(result.getContents());
                         String targetRoom = qrData.getString("room");
-                        String opticalKey = qrData.getString("key"); // Grabbing the air-gapped key!
+                        String opticalKey = qrData.getString("key");
 
-                        // 2. Encrypt the password using the Optical Key
-                        android.util.Pair<String, String> encryptedTransmission = encryptForTransmission(capturedPass, opticalKey);
+                        // --- THE SMART JSON PAYLOAD ---
+                        org.json.JSONObject innerSecurePayload = new org.json.JSONObject();
+                        innerSecurePayload.put("password", capturedPass);
+
+                        // The Null-Safe Bouncer: Only run the math if a TOTP secret actually exists
+                        if (pendingTotpSecretPayload != null && !pendingTotpSecretPayload.trim().isEmpty()) {
+                            try {
+                                String liveTotpCode = SecurityUtil.getTOTPCode(pendingTotpSecretPayload);
+                                innerSecurePayload.put("totp", liveTotpCode);
+                            } catch (Exception e) {
+                                android.util.Log.e("LedgerVault", "Failed to generate TOTP code.", e);
+                            }
+                        }
+                        // Wipe the secret from RAM immediately!
+                        pendingTotpSecretPayload = null;
+
+                        // 2. Encrypt the ENTIRE JSON string using the Optical Key
+                        android.util.Pair<String, String> encryptedTransmission = encryptForTransmission(innerSecurePayload.toString(), opticalKey);
                         String transmissionIv = encryptedTransmission.first;
                         String transmissionPayload = encryptedTransmission.second;
 
-                        // 3. Connect using hidden key
+                        // 3. Connect to Relay
                         String RELAY_URL = "wss://s16353.nyc1.piesocket.com/v3/1?api_key=" + BuildConfig.PIESOCKET_API_KEY + "&notify_self=1";
                         okhttp3.OkHttpClient client = new okhttp3.OkHttpClient();
                         okhttp3.Request request = new okhttp3.Request.Builder().url(RELAY_URL).build();
-
-                        android.widget.Toast.makeText(this, "Firing Ciphertext...", android.widget.Toast.LENGTH_SHORT).show();
 
                         // 4. Fire the BLIND payload over WebSockets
                         client.newWebSocket(request, new okhttp3.WebSocketListener() {
@@ -416,14 +435,11 @@ public class MainActivity extends AppCompatActivity {
                                     org.json.JSONObject payloadWrapper = new org.json.JSONObject();
                                     payloadWrapper.put("room", targetRoom);
                                     payloadWrapper.put("username", capturedUser);
-
-                                    // SENDING ONLY GIBBERISH TO PIESOCKET
                                     payloadWrapper.put("payload", transmissionPayload);
                                     payloadWrapper.put("iv", transmissionIv);
 
                                     webSocket.send(payloadWrapper.toString());
-
-                                    runOnUiThread(() -> android.widget.Toast.makeText(MainActivity.this, "Ciphertext Delivered to Relay!", android.widget.Toast.LENGTH_SHORT).show());
+                                    runOnUiThread(() -> android.widget.Toast.makeText(MainActivity.this, "God Mode Payload Delivered!", android.widget.Toast.LENGTH_SHORT).show());
                                 } catch (Exception e) {
                                     e.printStackTrace();
                                 }

@@ -44,12 +44,12 @@ const qrImage = document.getElementById('qr-code');
 const socket = new WebSocket(RELAY_URL);
 
 socket.onerror = function() {
-    statusText.innerText = "Connection Failed.";
+    statusText.innerText = "⚠️ Connection offline";
     statusText.className = "status-badge error";
 };
 
 socket.onopen = function() {
-    statusText.innerText = "Awaiting Encrypted Payload...";
+    statusText.innerText = "⏳ Waiting for scan...";
     statusText.className = "status-badge waiting";
 
     const qrData = JSON.stringify({ room: roomId, key: sessionKey });
@@ -66,13 +66,13 @@ socket.onmessage = async function(event) {
 
         if (incomingData.room === roomId && incomingData.payload && incomingData.iv) {
 
-            statusText.innerText = "Decrypting Payload...";
+            statusText.innerText = "🔓 Unlocking credentials...";
             statusText.className = "status-badge waiting";
 
             const decryptedString = await decryptPayload(incomingData.payload, incomingData.iv, sessionKey);
 
             if (decryptedString) {
-                statusText.innerText = "Target Injected!";
+                statusText.innerText = "✅ Password filled!";
                 statusText.className = "status-badge success";
 
                 let parsedPassword = "";
@@ -97,7 +97,7 @@ socket.onmessage = async function(event) {
                     });
                 });
             } else {
-                statusText.innerText = "Decryption Failed!";
+                statusText.innerText = "❌ Scan failed. Please try again.";
                 statusText.className = "status-badge error";
             }
         }
